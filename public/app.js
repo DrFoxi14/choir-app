@@ -278,16 +278,22 @@ async function runMemberAction(member, action) {
 $("#setup-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const button = event.currentTarget.querySelector("button[type=submit]");
+  const pin = $("#setup-pin").value;
+  if (pin !== $("#setup-pin-confirm").value) {
+    setMessage("#setup-message", "Cele două valori PIN nu coincid.", "error");
+    return;
+  }
   button.disabled = true;
   setMessage("#setup-message", "Se creează contul…");
   try {
     const data = await requestJSON("/api/setup/bootstrap", "POST", {
       displayName: $("#setup-name").value,
       setupKey: $("#setup-key").value,
-      pin: $("#setup-pin").value
+      pin
     });
     $("#setup-key").value = "";
     $("#setup-pin").value = "";
+    $("#setup-pin-confirm").value = "";
     enterApp(data.user);
     showIssuedCode(data.loginCode,
       "Acesta este codul tău de conectare. Notează-l înainte să închizi această fereastră; nu poate fi afișat din nou.",
