@@ -10,6 +10,18 @@ CREATE TABLE IF NOT EXISTS choirs (
   updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
+CREATE TABLE IF NOT EXISTS choir_domains (
+  id TEXT PRIMARY KEY,
+  choir_id TEXT NOT NULL REFERENCES choirs(id) ON DELETE CASCADE,
+  hostname TEXT NOT NULL UNIQUE,
+  status TEXT NOT NULL DEFAULT 'pending'
+    CHECK (status IN ('pending', 'active', 'disabled')),
+  created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+);
+
+INSERT OR IGNORE INTO choirs (id, name, slug)
+VALUES ('choir_tabor', 'Corul Tabor', 'tabor');
+
 -- A person has one account and can belong to more than one choir.
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
@@ -40,8 +52,7 @@ CREATE INDEX IF NOT EXISTS idx_memberships_user
 CREATE INDEX IF NOT EXISTS idx_memberships_choir
   ON choir_memberships(choir_id, status, role);
 
--- Only a hash of the one-time activation code is stored. Code issuance and
--- redemption logic must enforce expiry, single use, rate limits and choir scope.
+-- Store only a hash of each one-time activation code, never its plaintext.
 CREATE TABLE IF NOT EXISTS activation_codes (
   id TEXT PRIMARY KEY,
   choir_id TEXT NOT NULL REFERENCES choirs(id) ON DELETE CASCADE,
