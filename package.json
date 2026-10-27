@@ -1,0 +1,16 @@
+{
+  "name": "choir-app",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Choir App web platform for Corul Tabor",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.3",
+    "wrangler": "^4.0.0"
+  }
+}
