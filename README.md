@@ -1,6 +1,6 @@
 # Choir App — Corul Tabor
 
-Private source repository for the Choir App web application while development is in progress. The repository may be made public temporarily for CI testing; never commit secrets, real member data, or choir audio/video/PDF files.
+Private source repository for the Choir App web application. CI has been verified against this private repository; do not make it public solely for testing. Never commit secrets, real member data, or choir audio/video/PDF files.
 
 ## Product goals
 
