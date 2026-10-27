@@ -13,6 +13,7 @@ interface Env {
   ASSETS: AssetFetcher;
   DB?: D1Database;
   DEFAULT_CHOIR_SLUG?: string;
+  MEMBER_CATALOG_AUTH?: string;
 }
 interface SongRow {
   id: string; title: string; slug: string; description: string | null; sort_order: number;
