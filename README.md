@@ -4,52 +4,49 @@ Private source repository for the Choir App web application.
 
 ## Product goals
 
-- Mobile-first catalog for choir members.
+- Mobile-first song catalog for choir members.
 - Each member has a saved voice part: Soprano, Alto, Tenor, or Bass.
-- Every song can expose the available PDF, audio, and video for that member's assigned voice.
-- Conductor tools will manage their choir, member invitations, activation codes, and published assets.
-- The platform is designed for multiple choirs, with server-enforced tenant isolation.
+- Each song may have a PDF, audio, and video for each voice.
+- Conductors will manage their choir, member invitations, activation codes, and published assets.
+- The data model supports multiple choirs. Catalog queries must always be scoped to a choir.
 
 ## Current status
 
-This repository is the initial foundation. Do not treat it as production-ready yet: user accounts, activation codes, authorization, storage configuration, monitoring, and end-to-end tests still need implementation and validation.
+This is an initial foundation, not a production-ready member service. The responsive UI and base schema exist. Account activation, session authentication, role enforcement, conductor screens, private asset delivery, upload/publish tools, rate limiting, monitoring, and end-to-end tests still need implementation and validation.
 
 ## Stack
 
 - Cloudflare Workers (TypeScript)
-- Static Assets for the web UI
+- Cloudflare Workers Static Assets
 - Cloudflare D1 for relational metadata
-- Cloudflare R2 for media objects
-- GitHub Actions + Wrangler for deploys after Cloudflare credentials are configured as repository secrets
+- Cloudflare R2 for media
+- GitHub Actions + Wrangler for deploys when explicitly enabled
 
 ## Local development
 
 Requirements: Node.js LTS and npm.
 
-```bash
-npm install
-npm run dev
-```
+Install dependencies with npm install, then start the development server with npm run dev.
 
-To check TypeScript:
-
-```bash
-npm run typecheck
-```
+Type-check the Worker with npm run typecheck.
 
 ## Cloudflare setup
 
-1. Create a Worker named `cor` in the Cloudflare account whose `workers.dev` subdomain is `tabor`.
-2. Create a D1 database and apply the migrations in `migrations/`.
-3. Create the required R2 buckets and bind them to the Worker after confirming the names and account.
-4. Update `wrangler.toml` with the real D1 database ID and configured resource bindings; do not commit account secrets or API tokens.
-5. For GitHub Actions deploys, add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as repository Actions secrets.
-6. Run the security and production checklist before sharing with real choir members.
+1. In the dedicated Cloudflare account, configure the workers.dev subdomain as tabor if available.
+2. Create a D1 database, then uncomment its binding in wrangler.toml and replace the placeholder with the real database ID.
+3. Apply migrations with: npx wrangler d1 migrations apply choir-app-db --remote
+4. Create R2 buckets and add their bindings to wrangler.toml once the bucket names and account are confirmed.
+5. Configure the repository Actions secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
+6. Only after staging checks and bindings are ready, set the repository Actions variable ENABLE_CLOUDFLARE_DEPLOY to true to enable the deploy step.
 
-## Core design rules
+Do not configure Cloudflare's native GitHub deployment for this repository if the same GitHub account is already integrated with another Cloudflare account. Use the explicit GitHub Actions workflow after its credentials are set up.
 
-- Voice selection is saved once per account/device; it is not asked for every song.
-- Catalog entries are shared song records; assets are linked by song, voice, and format.
-- Private media must never be served directly from public buckets. Verify member/choir permissions on the server before issuing access to private assets.
-- Activation codes must be single-use, expiring, rate-limited, and stored as hashes, never as plaintext.
+## Core design and security rules
+
+- Voice selection is currently saved in the browser for this initial UI; account-backed preference is not implemented yet.
+- The catalog uses a shared song record plus separate asset records by song, voice, and format.
+- Multi-tenant catalog queries must always be scoped to the resolved choir.
+- Private media must never be served directly from a public bucket. Verify the active session and choir permissions before issuing access to private assets.
+- Activation codes must be single-use, expiring, rate-limited, revoked when needed, and stored as hashes, never plaintext.
+- Store only hashes of session tokens in D1. Cookies and session validation still need implementation and security review.
 - Secrets belong in Cloudflare/GitHub secret stores, not in source files.
