@@ -1,4 +1,4 @@
-const roleNames = { owner: "Administrator principal", conductor: "Dirijor", member: "Membru" };
+const roleNames = { owner: "Dirijor principal", conductor: "Dirijor", member: "Membru" };
 const voiceNames = { S: "Sopran", A: "Alto", T: "Tenor", B: "Bas" };
 const $ = (selector) => document.querySelector(selector);
 
