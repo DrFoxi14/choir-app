@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#172554">
-  <meta name="description" content="Materialele muzicale ale corului, organizate simplu pentru fiecare voce.">
+  <meta name="description" content="Repertoriul și materialele Corului Tabor, cu acces separat pentru membri și dirijori.">
   <title>Choir App · Corul Tabor</title>
   <link rel="stylesheet" href="/styles.css">
   <script src="/app.js" defer></script>
@@ -13,35 +13,168 @@
   <main class="shell">
     <header class="topbar">
       <div class="brand-mark" aria-hidden="true">♪</div>
-      <div>
+      <div class="brand-copy">
         <p class="eyebrow">CORUL TABOR</p>
         <h1>Choir App</h1>
       </div>
-      <button id="change-voice" class="text-button hidden" type="button">Schimbă vocea</button>
+      <div class="header-actions">
+        <span id="user-summary" class="user-summary hidden"></span>
+        <button id="logout-button" class="text-button hidden" type="button">Deconectare</button>
+      </div>
     </header>
 
-    <section id="voice-screen" class="panel voice-panel" aria-labelledby="voice-title">
-      <p class="eyebrow">BINE AI VENIT</p>
-      <h2 id="voice-title">Ce voce cânți?</h2>
-      <p class="muted">Alege vocea o singură dată pe acest dispozitiv. În versiunea cu cont, preferința va fi asociată contului tău.</p>
-      <div class="voice-grid" role="group" aria-label="Alege vocea">
-        <button class="voice-choice" data-voice="S" type="button"><strong>S</strong><span>Soprano</span></button>
-        <button class="voice-choice" data-voice="A" type="button"><strong>A</strong><span>Alto</span></button>
-        <button class="voice-choice" data-voice="T" type="button"><strong>T</strong><span>Tenor</span></button>
-        <button class="voice-choice" data-voice="B" type="button"><strong>B</strong><span>Bass</span></button>
+    <p id="configuration-notice" class="notice hidden" role="status"></p>
+
+    <section id="setup-screen" class="panel auth-panel hidden" aria-labelledby="setup-title">
+      <p class="eyebrow">CONFIGURARE INIȚIALĂ</p>
+      <h2 id="setup-title">Creează contul principal</h2>
+      <p class="muted">Acest pas se face o singură dată. Contul principal poate invita ceilalți dirijori și administra accesul la cor.</p>
+      <form id="setup-form" class="form-stack">
+        <label for="setup-name">Numele tău</label>
+        <input id="setup-name" name="displayName" autocomplete="name" maxlength="80" required>
+        <label for="setup-key">Cheia de configurare</label>
+        <input id="setup-key" name="setupKey" type="password" autocomplete="off" required>
+        <label for="setup-pin">Alege un PIN din 6 cifre</label>
+        <input id="setup-pin" name="pin" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
+        <button class="primary-button" type="submit">Creează contul principal</button>
+        <p id="setup-message" class="form-message" role="status"></p>
+      </form>
+    </section>
+
+    <section id="auth-screen" class="panel auth-panel hidden" aria-labelledby="login-title">
+      <p class="eyebrow">ACCESUL MEMBRILOR</p>
+      <h2 id="login-title">Conectare</h2>
+      <p class="muted">Folosește codul contului și PIN-ul pe care le-ai primit la activare. Nu trebuie să alegi vocea pe acest dispozitiv: contul tău este deja asociat cu ea.</p>
+      <form id="login-form" class="form-stack">
+        <label for="login-code">Codul contului</label>
+        <input id="login-code" name="loginCode" autocomplete="username" autocapitalize="characters" spellcheck="false" placeholder="ABCDE-FGHIJ" required>
+        <label for="login-pin">PIN din 6 cifre</label>
+        <input id="login-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required>
+        <button class="primary-button" type="submit">Conectare</button>
+        <p id="login-message" class="form-message" role="status"></p>
+      </form>
+
+      <details class="secondary-form">
+        <summary>Am primit un cod de activare</summary>
+        <p class="muted compact">Introdu codul transmis de un dirijor, numele tău și un PIN pe care să îl ții minte.</p>
+        <form id="activate-form" class="form-stack">
+          <label for="activation-code">Cod de activare</label>
+          <input id="activation-code" name="code" autocapitalize="characters" spellcheck="false" required>
+          <label for="activation-name">Numele tău</label>
+          <input id="activation-name" name="displayName" autocomplete="name" maxlength="80" required>
+          <label for="activation-pin">Alege un PIN din 6 cifre</label>
+          <input id="activation-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
+          <label for="activation-pin-confirm">Repetă PIN-ul</label>
+          <input id="activation-pin-confirm" name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
+          <button class="primary-button" type="submit">Activează contul</button>
+          <p id="activate-message" class="form-message" role="status"></p>
+        </form>
+      </details>
+
+      <details class="secondary-form">
+        <summary>Am uitat PIN-ul</summary>
+        <p class="muted compact">Cere unui dirijor un cod de resetare. Ai nevoie și de codul contului tău.</p>
+        <form id="reset-form" class="form-stack">
+          <label for="reset-login-code">Codul contului</label>
+          <input id="reset-login-code" name="loginCode" autocapitalize="characters" spellcheck="false" required>
+          <label for="reset-code">Cod de resetare primit de la dirijor</label>
+          <input id="reset-code" name="resetCode" autocapitalize="characters" spellcheck="false" required>
+          <label for="reset-pin">PIN nou din 6 cifre</label>
+          <input id="reset-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
+          <label for="reset-pin-confirm">Repetă PIN-ul nou</label>
+          <input id="reset-pin-confirm" name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
+          <button class="primary-button" type="submit">Resetează PIN-ul</button>
+          <p id="reset-message" class="form-message" role="status"></p>
+        </form>
+      </details>
+    </section>
+
+    <section id="credentials-notice" class="panel credentials-panel hidden" aria-labelledby="credentials-title">
+      <p class="eyebrow">PĂSTREAZĂ CODUL</p>
+      <h2 id="credentials-title">Notează acest cod</h2>
+      <p id="issued-code-message" class="muted"></p>
+      <div id="issued-code" class="issued-code"></div>
+      <div class="inline-actions">
+        <button id="copy-code-button" class="primary-button" type="button">Copiază codul</button>
+        <button id="hide-code-button" class="secondary-button" type="button">Am notat codul</button>
       </div>
     </section>
 
-    <section id="catalog-screen" class="catalog hidden" aria-labelledby="catalog-title">
+    <section id="member-screen" class="catalog hidden" aria-labelledby="catalog-title">
       <div class="catalog-heading">
         <div>
-          <p class="eyebrow">MATERIALELE TALE</p>
+          <p class="eyebrow">REPERTORIUL TĂU</p>
           <h2 id="catalog-title">Cântări</h2>
         </div>
         <span id="voice-badge" class="voice-badge"></span>
       </div>
       <p id="catalog-message" class="muted" role="status">Se încarcă repertoriul…</p>
       <div id="song-list" class="song-list"></div>
+    </section>
+
+    <section id="conductor-screen" class="catalog hidden" aria-labelledby="conductor-title">
+      <div class="catalog-heading">
+        <div>
+          <p class="eyebrow">ZONA DIRIJORILOR</p>
+          <h2 id="conductor-title">Panou de administrare</h2>
+        </div>
+        <span id="conductor-role-badge" class="voice-badge">Dirijor</span>
+      </div>
+      <p class="muted">Gestionează invitațiile, membrii și accesul. Codurile generate sunt afișate o singură dată; transmite-le direct persoanei pentru care au fost create.</p>
+
+      <section class="panel dashboard-section" aria-labelledby="invite-title">
+        <h3 id="invite-title">Invită un membru sau un dirijor</h3>
+        <form id="invitation-form" class="form-stack">
+          <label for="invitation-role">Tipul contului</label>
+          <select id="invitation-role" name="role">
+            <option value="member">Membru al corului</option>
+            <option id="conductor-invite-option" value="conductor" hidden>Dirijor</option>
+          </select>
+          <div id="invitation-voice-group">
+            <label for="invitation-voice">Vocea membrului</label>
+            <select id="invitation-voice" name="voicePart" required>
+              <option value="S">Sopran</option>
+              <option value="A">Alto</option>
+              <option value="T">Tenor</option>
+              <option value="B">Bas</option>
+            </select>
+          </div>
+          <button class="primary-button" type="submit">Generează cod de invitație</button>
+          <p class="muted compact">Codul este valabil 7 zile și poate fi folosit o singură dată.</p>
+          <p id="invitation-message" class="form-message" role="status"></p>
+        </form>
+      </section>
+
+      <section class="panel dashboard-section" aria-labelledby="members-title">
+        <div class="section-heading">
+          <h3 id="members-title">Membrii corului</h3>
+          <button id="refresh-members" class="secondary-button" type="button">Reîncarcă</button>
+        </div>
+        <p id="members-message" class="muted compact" role="status"></p>
+        <div id="member-list" class="managed-list"></div>
+      </section>
+
+      <section class="panel dashboard-section" aria-labelledby="invitations-title">
+        <div class="section-heading">
+          <h3 id="invitations-title">Invitații active</h3>
+          <button id="refresh-invitations" class="secondary-button" type="button">Reîncarcă</button>
+        </div>
+        <p id="invitations-message" class="muted compact" role="status"></p>
+        <div id="invitation-list" class="managed-list"></div>
+      </section>
+
+      <section class="panel dashboard-section" aria-labelledby="conductor-catalog-title">
+        <h3 id="conductor-catalog-title">Previzualizare repertoriu</h3>
+        <label for="conductor-voice">Vezi repertoriul pentru vocea</label>
+        <select id="conductor-voice">
+          <option value="S">Sopran</option>
+          <option value="A">Alto</option>
+          <option value="T">Tenor</option>
+          <option value="B">Bas</option>
+        </select>
+        <p id="conductor-catalog-message" class="muted compact" role="status"></p>
+        <div id="conductor-song-list" class="song-list"></div>
+      </section>
     </section>
 
     <footer>
