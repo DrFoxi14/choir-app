@@ -28,3 +28,13 @@ migrations_dir = "migrations"
 # bucket_name = "choir-masters-private"
 #
 # Do not add API tokens or other secrets to this file.
+
+# Isolated database and variables for Cloudflare Worker Previews.
+[previews.vars]
+DEFAULT_CHOIR_SLUG = "tabor"
+
+[[previews.d1_databases]]
+binding = "DB"
+database_name = "choir-app-preview"
+database_id = "490af251-9e3c-45cd-adc4-7ca41e6f633a"
+migrations_dir = "migrations"
