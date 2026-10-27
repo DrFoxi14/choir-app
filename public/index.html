@@ -35,7 +35,9 @@
         <label for="setup-key">Cheia de configurare</label>
         <input id="setup-key" name="setupKey" type="password" autocomplete="off" required>
         <label for="setup-pin">Alege un PIN din 6 cifre</label>
-        <input id="setup-pin" name="pin" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
+        <input id="setup-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
+        <label for="setup-pin-confirm">Repetă PIN-ul</label>
+        <input id="setup-pin-confirm" name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
         <button class="primary-button" type="submit">Creează contul principal</button>
         <p id="setup-message" class="form-message" role="status"></p>
       </form>
