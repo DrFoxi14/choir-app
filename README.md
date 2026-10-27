@@ -1,6 +1,6 @@
 # Choir App — Corul Tabor
 
-Private source repository for the Choir App web application. CI has been verified against this private repository; do not make it public solely for testing. Never commit secrets, real member data, or choir audio/video/PDF files.
+Source repository for Choir App — temporarily public during initial development to use free GitHub-hosted Actions runners. Plan: return it to private before launch. Never commit secrets, real member data, or choir audio/video/PDF files.
 
 ## Product goals
 
@@ -20,7 +20,7 @@ This is an initial foundation, not a production-ready member service. The respon
 - Cloudflare Workers Static Assets
 - Cloudflare D1 for relational metadata
 - Cloudflare R2 for media
-- GitHub Actions + Wrangler for manually triggered deploys when explicitly enabled
+- GitHub Actions for CI and manually triggered Wrangler deploys when explicitly enabled
 
 ## Local development
 
