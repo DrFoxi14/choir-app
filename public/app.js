@@ -297,7 +297,7 @@ $("#setup-form").addEventListener("submit", async (event) => {
     $("#setup-pin-confirm").value = "";
     enterApp(data.user);
     showIssuedCode(data.loginCode,
-      "Acesta este codul tău de conectare. Notează-l înainte să închizi această fereastră; nu poate fi afișat din nou.",
+      "Acesta este codul tău de conectare. Notează-l înainte să închizi această fereastră; nu poate fi afișat din nou. După configurare, șterge secretul BOOTSTRAP_SETUP_KEY din Cloudflare Worker → Settings → Variables and Secrets.",
       "Codul contului principal");
   } catch (error) {
     setMessage("#setup-message", error.message, "error");
