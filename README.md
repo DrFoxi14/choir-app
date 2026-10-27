@@ -20,7 +20,7 @@ This is an initial foundation, not a production-ready member service. The respon
 - Cloudflare Workers Static Assets
 - Cloudflare D1 for relational metadata
 - Cloudflare R2 for media
-- GitHub Actions + Wrangler for deploys when explicitly enabled
+- GitHub Actions + Wrangler for manually triggered deploys when explicitly enabled
 
 ## Local development
 
@@ -38,6 +38,7 @@ Type-check the Worker with npm run typecheck.
 4. Create R2 buckets and add their bindings to wrangler.toml once the bucket names and account are confirmed.
 5. Configure the repository Actions secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
 6. Only after staging checks and bindings are ready, set the repository Actions variable ENABLE_CLOUDFLARE_DEPLOY to true to enable the deploy step.
+7. Run the Deploy Choir App workflow manually from GitHub Actions.
 
 Do not configure Cloudflare's native GitHub deployment for this repository if the same GitHub account is already integrated with another Cloudflare account. Use the explicit GitHub Actions workflow after its credentials are set up.
 
