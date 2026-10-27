@@ -1,6 +1,6 @@
 # Choir App — Corul Tabor
 
-Private source repository for the Choir App web application.
+Private source repository for the Choir App web application while development is in progress. The repository may be made public temporarily for CI testing; never commit secrets, real member data, or choir audio/video/PDF files.
 
 ## Product goals
 
@@ -26,18 +26,18 @@ This is an initial foundation, not a production-ready member service. The respon
 
 Requirements: Node.js LTS and npm.
 
-Install dependencies with npm install, then start the development server with npm run dev.
+Install dependencies with `npm install`, then start the development server with `npm run dev`.
 
-Type-check the Worker with npm run typecheck.
+Type-check the Worker with `npm run typecheck`.
 
 ## Cloudflare setup
 
-1. In the dedicated Cloudflare account, configure the workers.dev subdomain as tabor if available.
-2. Create a D1 database, then uncomment its binding in wrangler.toml and replace the placeholder with the real database ID.
-3. Apply migrations with: npx wrangler d1 migrations apply choir-app-db --remote
-4. Create R2 buckets and add their bindings to wrangler.toml once the bucket names and account are confirmed.
-5. Configure the repository Actions secrets CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID.
-6. Only after staging checks and bindings are ready, set the repository Actions variable ENABLE_CLOUDFLARE_DEPLOY to true to enable the deploy step.
+1. In the dedicated Cloudflare account, configure the `workers.dev` subdomain as `tabor` if available.
+2. The D1 binding is configured in `wrangler.toml` using the database ID supplied during setup. Confirm its database name is `choir-app-db`.
+3. Apply migrations after the correct Cloudflare account is authenticated: `npx wrangler d1 migrations apply choir-app-db --remote`.
+4. Create R2 buckets and add their bindings to `wrangler.toml` once the bucket names and account are confirmed.
+5. Configure the repository Actions secrets `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`.
+6. Only after staging checks and bindings are ready, set the repository Actions variable `ENABLE_CLOUDFLARE_DEPLOY` to `true` to enable the deployment step.
 7. Run the Deploy Choir App workflow manually from GitHub Actions.
 
 Do not configure Cloudflare's native GitHub deployment for this repository if the same GitHub account is already integrated with another Cloudflare account. Use the explicit GitHub Actions workflow after its credentials are set up.
