@@ -387,14 +387,18 @@ async function activateAccount(request: Request, env: Env): Promise<Response> {
   const tokenHash = await sha256(token);
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 86400000).toISOString();
   const statements = [
-    env.DB.prepare(
-      "UPDATE activation_codes SET used_at = ?, used_by_user_id = ? " +
-      "WHERE id = ? AND code_hash = ? AND choir_id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?"
-    ).bind(now, userId, candidate.id, codeHash, choir.id, now),
+    // Create the user only while the invitation is still valid. The FK on
+    // used_by_user_id requires the user row to exist before claiming the code.
     env.DB.prepare(
       "INSERT INTO users (id, display_name, email_normalized, login_code_hash, pin_salt, pin_hash) " +
-      "SELECT ?, ?, NULL, ?, ?, ? WHERE EXISTS (SELECT 1 FROM activation_codes WHERE id = ? AND used_by_user_id = ?)"
-    ).bind(userId, displayName, loginHash, pinSalt, pinHash, candidate.id, userId),
+      "SELECT ?, ?, NULL, ?, ?, ? WHERE EXISTS (SELECT 1 FROM activation_codes " +
+      "WHERE id = ? AND code_hash = ? AND choir_id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?)"
+    ).bind(userId, displayName, loginHash, pinSalt, pinHash, candidate.id, codeHash, choir.id, now),
+    env.DB.prepare(
+      "UPDATE activation_codes SET used_at = ?, used_by_user_id = ? " +
+      "WHERE id = ? AND code_hash = ? AND choir_id = ? AND used_at IS NULL AND revoked_at IS NULL " +
+      "AND expires_at > ? AND EXISTS (SELECT 1 FROM users WHERE id = ?)"
+    ).bind(now, userId, candidate.id, codeHash, choir.id, now, userId),
     env.DB.prepare(
       "INSERT INTO choir_memberships (id, choir_id, user_id, role, voice_part, status) " +
       "SELECT ?, a.choir_id, ?, a.intended_role, a.voice_part, 'active' FROM activation_codes a " +
@@ -412,8 +416,8 @@ async function activateAccount(request: Request, env: Env): Promise<Response> {
       JSON.stringify({ role: candidate.intended_role, voicePart: candidate.voice_part }), membershipId, userId)
   ];
   const results = await env.DB.batch(statements);
-  if (Number(results[0]?.meta?.changes || 0) !== 1 || Number(results[2]?.meta?.changes || 0) !== 1 ||
-      Number(results[3]?.meta?.changes || 0) !== 1) {
+  if (Number(results[0]?.meta?.changes || 0) !== 1 || Number(results[1]?.meta?.changes || 0) !== 1 ||
+      Number(results[2]?.meta?.changes || 0) !== 1 || Number(results[3]?.meta?.changes || 0) !== 1) {
     return fail("invalid_activation_code", "Codul nu este valid, a expirat sau a fost deja folosit.", 409);
   }
   return json({
