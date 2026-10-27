@@ -32,7 +32,7 @@ Type-check the Worker with `npm run typecheck`.
 
 ## Cloudflare setup
 
-1. In the dedicated Cloudflare account, configure the `workers.dev` subdomain as `tabor` if available.
+1. In the dedicated Cloudflare account, the available `workers.dev` account subdomain selected for this project is `tabororadea`. With Worker name `cor`, the expected URL is `https://cor.tabororadea.workers.dev`.
 2. The D1 binding is configured in `wrangler.toml` using the database ID supplied during setup. Confirm its database name is `choir-app-db`.
 3. Apply migrations after the correct Cloudflare account is authenticated: `npx wrangler d1 migrations apply choir-app-db --remote`.
 4. Create R2 buckets and add their bindings to `wrangler.toml` once the bucket names and account are confirmed.
