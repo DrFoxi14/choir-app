@@ -55,6 +55,14 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     });
   }
   if (request.method === "GET" && path === "/api/songs") {
+    // Fail closed until member sessions and choir membership authorization exist.
+    // Do not expose the published catalog anonymously during the preview deployment.
+    if (env.MEMBER_CATALOG_AUTH !== "enabled") {
+      return json({
+        error: "authentication_not_ready",
+        message: "Catalogul va fi activat după implementarea autentificării membrilor."
+      }, 503);
+    }
     if (!env.DB) {
       return json({
         error: "database_not_configured",
