@@ -493,7 +493,7 @@ async function resetAccess(request: Request, env: Env): Promise<Response> {
   if (!candidate) return fail("invalid_reset_code", "Codul de resetare nu este valid sau a expirat.", 400);
   const salt = randomHex(16);
   const pinHash = await derivePinHash(pin, salt);
-  const usedAt = new Date().toISOString();
+  const usedAt = new Date().toISOString() + ":" + randomHex(8);
   const statements = [
     env.DB.prepare(
       "UPDATE access_reset_codes SET used_at = ?, used_by_user_id = ? " +
