@@ -117,6 +117,7 @@ function showIssuedCode(code, message, label = "Notează acest cod") {
   $("#credentials-title").textContent = label;
   $("#issued-code-message").textContent = message || "Păstrează codul într-un loc sigur. Nu este stocat în clar și nu poate fi afișat din nou.";
   $("#issued-code").textContent = code || "";
+  $("#copy-code-button").textContent = "Copiază codul";
   screens.code.classList.remove("hidden");
   screens.code.scrollIntoView({ behavior: "smooth", block: "center" });
 }
