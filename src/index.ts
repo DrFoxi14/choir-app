@@ -104,8 +104,10 @@ function hexToBytes(value: string): Uint8Array {
 }
 async function derivePinHash(pin: string, saltHex: string): Promise<string> {
   const key = await crypto.subtle.importKey("raw", encoder.encode(pin), "PBKDF2", false, ["deriveBits"]);
+  const saltBuffer = new ArrayBuffer(saltHex.length / 2);
+  new Uint8Array(saltBuffer).set(hexToBytes(saltHex));
   const derived = await crypto.subtle.deriveBits({
-    name: "PBKDF2", salt: hexToBytes(saltHex), iterations: PIN_ITERATIONS, hash: "SHA-256"
+    name: "PBKDF2", salt: saltBuffer, iterations: PIN_ITERATIONS, hash: "SHA-256"
   }, key, 256);
   return Array.from(new Uint8Array(derived), (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
@@ -768,6 +770,17 @@ export default {
         );
       }
     }
-    return env.ASSETS.fetch(request);
+    const assetResponse = await env.ASSETS.fetch(request);
+    const headers = new Headers(assetResponse.headers);
+    headers.set("X-Content-Type-Options", "nosniff");
+    headers.set("Referrer-Policy", "no-referrer");
+    headers.set("X-Frame-Options", "DENY");
+    headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    headers.set("Content-Security-Policy", "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests");
+    return new Response(assetResponse.body, {
+      status: assetResponse.status,
+      statusText: assetResponse.statusText,
+      headers
+    });
   }
 };
