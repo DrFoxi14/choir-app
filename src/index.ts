@@ -693,6 +693,9 @@ async function updateAccountPhone(request: Request, env: Env): Promise<Response>
       ).bind(phoneNumber, new Date().toISOString(), current.userId, current.userId, current.choirId,
         authorizedCode.resetId, usedAt, current.userId, phoneNumber, current.userId),
       env.DB.prepare(
+        "UPDATE choir_memberships SET phone_verified_at = NULL, phone_verified_by_user_id = NULL WHERE user_id = ?"
+      ).bind(current.userId),
+      env.DB.prepare(
         "INSERT INTO audit_logs (id, choir_id, actor_user_id, action, target_type, target_id, metadata_json) " +
         "SELECT ?, ?, ?, 'account.phone.updated', 'user', ?, ? " +
         "WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND email_normalized = ?) " +
@@ -780,8 +783,11 @@ async function listMemberContacts(request: Request, env: Env): Promise<Response>
 
   const result = await env.DB.prepare(
     "SELECT u.id, u.display_name AS displayName, u.email_normalized AS phoneNumber, " +
+    "CASE WHEN m.phone_verified_at IS NULL THEN 0 ELSE 1 END AS phoneVerified, " +
+    "m.phone_verified_at AS phoneVerifiedAt, verifier.display_name AS phoneVerifiedBy, " +
     "m.role, m.voice_part AS voicePart, m.created_at AS joinedAt " +
     "FROM choir_memberships m JOIN users u ON u.id = m.user_id " +
+    "LEFT JOIN users verifier ON verifier.id = m.phone_verified_by_user_id " +
     "WHERE m.choir_id = ? AND m.status = 'active' AND u.status = 'active' " +
     "ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'conductor' THEN 1 ELSE 2 END, u.display_name COLLATE NOCASE"
   ).bind(current.choirId).all();
@@ -820,6 +826,68 @@ async function listInvitations(request: Request, env: Env): Promise<Response> {
     "ORDER BY a.created_at DESC LIMIT 100"
   ).bind(current.choirId, now).all();
   return json({ invitations: result.results ?? [], actorRole: current.role });
+}
+async function updateMemberPhoneVerification(
+  request: Request, env: Env, targetId: string
+): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot verifica numerele membrilor.", 403);
+  const target = await manageableMember(env, current, targetId);
+  if (target instanceof Response) return target;
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+
+  const body = await readJson(request);
+  if (!body || typeof body.verified !== "boolean" || !validPin(body.pin)) {
+    return fail("invalid_request", "Introdu PIN-ul de 6 cifre și alege starea verificării.", 400);
+  }
+  if (!(await allowAttempt(request, env, "phone-verification-ip", 24)) ||
+      !(await allowAttempt(request, env, "phone-verification-user", 12, await sha256(current.userId)))) {
+    return fail("rate_limited", "Prea multe încercări. Reîncearcă peste 15 minute.", 429);
+  }
+
+  const credentials = await env.DB.prepare(
+    "SELECT pin_salt, pin_hash FROM users WHERE id = ? AND status = 'active' LIMIT 1"
+  ).bind(current.userId).all<{ pin_salt: string; pin_hash: string }>();
+  const credential = credentials.results?.[0];
+  const calculatedHash = await derivePinHash(body.pin as string, credential?.pin_salt || "00000000000000000000000000000000");
+  if (!credential?.pin_hash || !constantTimeEqual(calculatedHash, credential.pin_hash)) {
+    return fail("invalid_pin", "PIN incorect. Starea verificării nu a fost modificată.", 401);
+  }
+
+  const verified = body.verified;
+  const now = new Date().toISOString();
+  const update = await env.DB.prepare(
+    "UPDATE choir_memberships SET phone_verified_at = ?, phone_verified_by_user_id = ? " +
+    "WHERE choir_id = ? AND user_id = ? AND status = 'active' " +
+    "AND EXISTS (SELECT 1 FROM users WHERE id = ? AND status = 'active' " +
+    "AND (? = 0 OR email_normalized IS NOT NULL))"
+  ).bind(
+    verified ? now : null,
+    verified ? current.userId : null,
+    current.choirId,
+    targetId,
+    targetId,
+    verified ? 1 : 0
+  ).run();
+  if (Number(update.meta?.changes || 0) !== 1) {
+    return fail("phone_unavailable", "Nu există un număr salvat pentru acest membru sau contul nu mai este activ.", 409);
+  }
+
+  await recordAudit(
+    env, current.choirId, current.userId,
+    verified ? "account.phone.verified_by_conductor" : "account.phone.verification_revoked",
+    "user", targetId, { verified }
+  );
+  return json({
+    ok: true,
+    phoneVerified: verified,
+    phoneVerifiedAt: verified ? now : null,
+    phoneVerifiedBy: verified ? current.displayName : null,
+    message: verified
+      ? "Numărul a fost marcat ca verificat de dirijor."
+      : "Bifa de verificare a fost eliminată."
+  });
 }
 async function createInvitation(request: Request, env: Env): Promise<Response> {
   const current = await requireSession(request, env);
@@ -992,6 +1060,8 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === "POST" && path === "/api/conductor/contacts") return listMemberContacts(request, env);
   if (request.method === "GET" && path === "/api/conductor/invitations") return listInvitations(request, env);
   if (request.method === "POST" && path === "/api/conductor/invitations") return createInvitation(request, env);
+  const phoneVerificationMatch = path.match(/^\/api\/conductor\/members\/([a-f0-9-]{36})\/phone-verification$/);
+  if (request.method === "POST" && phoneVerificationMatch) return updateMemberPhoneVerification(request, env, phoneVerificationMatch[1]);
   const revokeMatch = path.match(/^\/api\/conductor\/invitations\/([a-f0-9-]{36})\/revoke$/);
   if (request.method === "POST" && revokeMatch) return revokeInvitation(request, env, revokeMatch[1]);
   const resetMatch = path.match(/^\/api\/conductor\/members\/([a-f0-9-]{36})\/reset$/);
