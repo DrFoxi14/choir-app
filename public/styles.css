@@ -142,3 +142,5 @@ footer p { margin-bottom: 5px; }
 @media (min-width: 640px) {
   .contact-card { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
 }
+
+.invitation-section-spaced { margin-top: 16px; }
