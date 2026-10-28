@@ -114,6 +114,11 @@ def main() -> None:
     assert 'id="legal-panel-form"' in INVITATION_HTML
     assert 'session.legalAcceptanceRequired' in INVITATION_JS
     assert 'requestJSON("/api/legal/accept", "POST", { acceptedLegal: true })' in INVITATION_JS
+    # Async submit handlers must retain the form element before awaiting network work.
+    assert "event.currentTarget.reset()" not in MAIN_JS
+    assert "event.currentTarget.reset()" not in INVITATION_JS
+    assert '$("#legal-acceptance-form").addEventListener("submit", async (event) => {\n  const form = event.currentTarget;' in MAIN_JS
+    assert '$("#legal-panel-form").addEventListener("submit", async (event) => {\n  const form = event.currentTarget;' in INVITATION_JS
 
 
 
