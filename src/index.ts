@@ -3,7 +3,7 @@ type VoicePart = "S" | "A" | "T" | "B";
 
 // Bump these version strings whenever the actual documents are materially updated.
 const TERMS_VERSION = "2026-10-28-v2";
-const PRIVACY_VERSION = "2026-10-28-v2";
+const PRIVACY_VERSION = "2026-10-28-v3";
 
 interface D1Result<T = Record<string, unknown>> {
   results?: T[];
@@ -150,11 +150,11 @@ function constantTimeEqual(left: string, right: string): boolean {
   }
   return difference === 0;
 }
-async function readJson(request: Request): Promise<Record<string, unknown> | null> {
+async function readJson(request: Request, maxBytes = 4096): Promise<Record<string, unknown> | null> {
   const contentLength = Number(request.headers.get("Content-Length") || 0);
-  if (contentLength > 4096) return null;
+  if (contentLength > maxBytes) return null;
   const text = await request.text();
-  if (text.length > 4096) return null;
+  if (text.length > maxBytes) return null;
   try {
     const parsed: unknown = JSON.parse(text);
     if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
@@ -925,7 +925,7 @@ async function saveAttendance(request: Request, env: Env): Promise<Response> {
   if (current instanceof Response) return current;
   if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot înregistra prezența.", 403);
   if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
-  const body = await readJson(request);
+  const body = await readJson(request, 32768);
   if (!body || !isIsoDate(body.date)) {
     return fail("invalid_attendance_date", "Alege o dată validă pentru repetiție.", 400);
   }
