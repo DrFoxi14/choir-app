@@ -69,6 +69,16 @@ function bootstrapConfigured(env: Env): boolean {
 function normalizeCode(value: string): string {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, "");
 }
+// The app does not use email sign-in. Reuse the existing unique email_normalized
+// column to store a canonical Romanian mobile number without requiring a D1 schema change.
+function normalizePhone(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const digits = value.replace(/\D/g, "");
+  if (digits.length === 10 && digits.startsWith("07")) return "+40" + digits.slice(1);
+  if (digits.length === 11 && digits.startsWith("407")) return "+" + digits;
+  if (digits.length === 13 && digits.startsWith("00407")) return "+40" + digits.slice(4);
+  return null;
+}
 function formatCode(value: string): string {
   const normalized = normalizeCode(value);
   if (normalized.length === 10) return normalized.slice(0, 5) + "-" + normalized.slice(5);
@@ -358,13 +368,20 @@ async function activateAccount(request: Request, env: Env): Promise<Response> {
   if (!body) return fail("invalid_request", "Cerere invalidă.", 400);
   const code = typeof body.code === "string" ? normalizeCode(body.code) : "";
   const displayName = cleanDisplayName(body.displayName);
+  const phoneNumber = normalizePhone(body.phone);
   const pin = body.pin;
-  if (code.length < 12 || !displayName || !validPin(pin)) {
-    return fail("invalid_fields", "Completează codul primit, numele și un PIN din 6 cifre.", 400);
+  if (code.length < 12 || !displayName || !phoneNumber || !validPin(pin)) {
+    return fail("invalid_fields", "Completează codul de invitație, numele, un număr de mobil românesc și un PIN din 6 cifre.", 400);
   }
   if (!sameOrigin(request)) return fail("origin_not_allowed", "Cerere refuzată.", 403);
   const choir = await getChoir(request, env);
   if (!choir || !env.DB) return fail("choir_not_configured", "Corul nu este configurat.", 503);
+  const phoneResult = await env.DB.prepare(
+    "SELECT id FROM users WHERE email_normalized = ? LIMIT 1"
+  ).bind(phoneNumber).all<{ id: string }>();
+  if (phoneResult.results?.length) {
+    return fail("phone_in_use", "Numărul acesta este deja asociat unui cont. Cere unui dirijor să te ajute.", 409);
+  }
   const codeHash = await sha256(code);
   const now = new Date().toISOString();
   const candidateResult = await env.DB.prepare(
@@ -376,8 +393,6 @@ async function activateAccount(request: Request, env: Env): Promise<Response> {
       (candidate.intended_role === "member" && !isVoicePart(candidate.voice_part))) {
     return fail("invalid_activation_code", "Codul nu este valid, a expirat sau a fost deja folosit.", 400);
   }
-  const loginCode = randomCode(10);
-  const loginHash = await sha256(loginCode);
   const userId = crypto.randomUUID();
   const membershipId = crypto.randomUUID();
   const sessionId = crypto.randomUUID();
@@ -391,9 +406,9 @@ async function activateAccount(request: Request, env: Env): Promise<Response> {
     // used_by_user_id requires the user row to exist before claiming the code.
     env.DB.prepare(
       "INSERT INTO users (id, display_name, email_normalized, login_code_hash, pin_salt, pin_hash) " +
-      "SELECT ?, ?, NULL, ?, ?, ? WHERE EXISTS (SELECT 1 FROM activation_codes " +
+      "SELECT ?, ?, ?, NULL, ?, ? WHERE EXISTS (SELECT 1 FROM activation_codes " +
       "WHERE id = ? AND code_hash = ? AND choir_id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ?)"
-    ).bind(userId, displayName, loginHash, pinSalt, pinHash, candidate.id, codeHash, choir.id, now),
+    ).bind(userId, displayName, phoneNumber, pinSalt, pinHash, candidate.id, codeHash, choir.id, now),
     env.DB.prepare(
       "UPDATE activation_codes SET used_at = ?, used_by_user_id = ? " +
       "WHERE id = ? AND code_hash = ? AND choir_id = ? AND used_at IS NULL AND revoked_at IS NULL " +
@@ -423,8 +438,8 @@ async function activateAccount(request: Request, env: Env): Promise<Response> {
   return json({
     authenticated: true,
     user: { displayName, role: candidate.intended_role, voicePart: candidate.voice_part, choirName: choir.name },
-    loginCode: formatCode(loginCode),
-    message: "Cont activat. Păstrează codul contului pentru conectările viitoare."
+    phoneLoginEnabled: true,
+    message: "Cont activat. De acum, conectarea se face cu numărul de telefon și PIN-ul."
   }, 200, { "Set-Cookie": sessionCookie(request, token, SESSION_DAYS * 86400) });
 }
 async function login(request: Request, env: Env): Promise<Response> {
@@ -432,26 +447,36 @@ async function login(request: Request, env: Env): Promise<Response> {
   if (unavailable) return unavailable;
   const body = await readJson(request);
   if (!body) return fail("invalid_request", "Cerere invalidă.", 400);
-  const loginCode = typeof body.loginCode === "string" ? normalizeCode(body.loginCode) : "";
+  const loginIdentity = typeof body.loginCode === "string" ? body.loginCode.trim() : "";
+  const phoneNumber = normalizePhone(loginIdentity);
+  const loginCode = phoneNumber ? "" : normalizeCode(loginIdentity);
   const pin = body.pin;
-  if (loginCode.length !== 10 || !validPin(pin)) {
-    return fail("invalid_credentials", "Codul contului sau PIN-ul nu este corect.", 401);
+  if ((!phoneNumber && loginCode.length !== 10) || !validPin(pin)) {
+    return fail("invalid_credentials", "Numărul de telefon (sau codul vechi al contului) și PIN-ul nu sunt corecte.", 401);
   }
+  const rateIdentity = phoneNumber || loginCode;
   if (!(await allowAttempt(request, env, "login-ip", 12)) ||
-      !(await allowAttempt(request, env, "login-account", 8, await sha256(loginCode)))) {
+      !(await allowAttempt(request, env, "login-account", 8, await sha256(rateIdentity)))) {
     return fail("rate_limited", "Prea multe încercări. Reîncearcă peste 15 minute.", 429);
   }
   if (!sameOrigin(request)) return fail("origin_not_allowed", "Cerere refuzată.", 403);
   const choir = await getChoir(request, env);
   if (!choir || !env.DB) return fail("choir_not_configured", "Corul nu este configurat.", 503);
-  const loginHash = await sha256(loginCode);
-  const result = await env.DB.prepare(
-    "SELECT u.id, u.display_name, u.login_code_hash, u.pin_salt, u.pin_hash, " +
-    "m.role, m.voice_part, c.id AS choir_id, c.slug AS choir_slug, c.name AS choir_name " +
-    "FROM users u JOIN choir_memberships m ON m.user_id = u.id AND m.choir_id = ? " +
-    "JOIN choirs c ON c.id = m.choir_id " +
-    "WHERE u.login_code_hash = ? AND u.status = 'active' AND m.status = 'active' AND c.status = 'active' LIMIT 1"
-  ).bind(choir.id, loginHash).all<UserPinRow>();
+  const result = phoneNumber
+    ? await env.DB.prepare(
+      "SELECT u.id, u.display_name, u.login_code_hash, u.pin_salt, u.pin_hash, " +
+      "m.role, m.voice_part, c.id AS choir_id, c.slug AS choir_slug, c.name AS choir_name " +
+      "FROM users u JOIN choir_memberships m ON m.user_id = u.id AND m.choir_id = ? " +
+      "JOIN choirs c ON c.id = m.choir_id " +
+      "WHERE u.email_normalized = ? AND u.status = 'active' AND m.status = 'active' AND c.status = 'active' LIMIT 1"
+    ).bind(choir.id, phoneNumber).all<UserPinRow>()
+    : await env.DB.prepare(
+      "SELECT u.id, u.display_name, u.login_code_hash, u.pin_salt, u.pin_hash, " +
+      "m.role, m.voice_part, c.id AS choir_id, c.slug AS choir_slug, c.name AS choir_name " +
+      "FROM users u JOIN choir_memberships m ON m.user_id = u.id AND m.choir_id = ? " +
+      "JOIN choirs c ON c.id = m.choir_id " +
+      "WHERE u.login_code_hash = ? AND u.status = 'active' AND m.status = 'active' AND c.status = 'active' LIMIT 1"
+    ).bind(choir.id, await sha256(loginCode)).all<UserPinRow>();
   const user = result.results?.[0];
   const calculatedHash = await derivePinHash(pin, user?.pin_salt || "00000000000000000000000000000000");
   if (!user || !isRole(user.role) || !user.pin_hash || !constantTimeEqual(calculatedHash, user.pin_hash)) {
@@ -470,29 +495,39 @@ async function resetAccess(request: Request, env: Env): Promise<Response> {
   if (unavailable) return unavailable;
   const body = await readJson(request);
   if (!body) return fail("invalid_request", "Cerere invalidă.", 400);
-  const loginCode = typeof body.loginCode === "string" ? normalizeCode(body.loginCode) : "";
+  const loginIdentity = typeof body.loginCode === "string" ? body.loginCode.trim() : "";
+  const phoneNumber = normalizePhone(loginIdentity);
+  const loginCode = phoneNumber ? "" : normalizeCode(loginIdentity);
   const resetCode = typeof body.resetCode === "string" ? normalizeCode(body.resetCode) : "";
   const pin = body.pin;
-  if (loginCode.length !== 10 || resetCode.length < 12 || !validPin(pin)) {
-    return fail("invalid_fields", "Verifică cele două coduri și PIN-ul de 6 cifre.", 400);
+  if ((!phoneNumber && loginCode.length !== 10) || resetCode.length < 12 || !validPin(pin)) {
+    return fail("invalid_fields", "Verifică numărul de telefon (sau codul vechi), codul de resetare și PIN-ul de 6 cifre.", 400);
   }
+  const rateIdentity = phoneNumber || loginCode;
   if (!(await allowAttempt(request, env, "reset-ip", 8)) ||
-      !(await allowAttempt(request, env, "reset-account", 5, await sha256(loginCode)))) {
+      !(await allowAttempt(request, env, "reset-account", 5, await sha256(rateIdentity)))) {
     return fail("rate_limited", "Prea multe încercări. Reîncearcă peste 15 minute.", 429);
   }
   if (!sameOrigin(request)) return fail("origin_not_allowed", "Cerere refuzată.", 403);
   const choir = await getChoir(request, env);
   if (!choir || !env.DB) return fail("choir_not_configured", "Corul nu este configurat.", 503);
-  const loginHash = await sha256(loginCode);
   const resetHash = await sha256(resetCode);
   const now = new Date().toISOString();
-  const candidateResult = await env.DB.prepare(
-    "SELECT r.id AS reset_id, u.id AS user_id FROM access_reset_codes r " +
-    "JOIN users u ON u.id = r.user_id JOIN choir_memberships m ON m.user_id = u.id AND m.choir_id = r.choir_id " +
-    "WHERE r.code_hash = ? AND u.login_code_hash = ? AND r.choir_id = ? " +
-    "AND r.used_at IS NULL AND r.revoked_at IS NULL AND r.expires_at > ? " +
-    "AND u.status = 'active' AND m.status = 'active' LIMIT 1"
-  ).bind(resetHash, loginHash, choir.id, now).all<{ reset_id: string; user_id: string }>();
+  const candidateResult = phoneNumber
+    ? await env.DB.prepare(
+      "SELECT r.id AS reset_id, u.id AS user_id FROM access_reset_codes r " +
+      "JOIN users u ON u.id = r.user_id JOIN choir_memberships m ON m.user_id = u.id AND m.choir_id = r.choir_id " +
+      "WHERE r.code_hash = ? AND u.email_normalized = ? AND r.choir_id = ? " +
+      "AND r.used_at IS NULL AND r.revoked_at IS NULL AND r.expires_at > ? " +
+      "AND u.status = 'active' AND m.status = 'active' LIMIT 1"
+    ).bind(resetHash, phoneNumber, choir.id, now).all<{ reset_id: string; user_id: string }>()
+    : await env.DB.prepare(
+      "SELECT r.id AS reset_id, u.id AS user_id FROM access_reset_codes r " +
+      "JOIN users u ON u.id = r.user_id JOIN choir_memberships m ON m.user_id = u.id AND m.choir_id = r.choir_id " +
+      "WHERE r.code_hash = ? AND u.login_code_hash = ? AND r.choir_id = ? " +
+      "AND r.used_at IS NULL AND r.revoked_at IS NULL AND r.expires_at > ? " +
+      "AND u.status = 'active' AND m.status = 'active' LIMIT 1"
+    ).bind(resetHash, await sha256(loginCode), choir.id, now).all<{ reset_id: string; user_id: string }>();
   const candidate = candidateResult.results?.[0];
   if (!candidate) return fail("invalid_reset_code", "Codul de resetare nu este valid sau a expirat.", 400);
   const salt = randomHex(16);
@@ -523,7 +558,9 @@ async function resetAccess(request: Request, env: Env): Promise<Response> {
   if (Number(results[0]?.meta?.changes || 0) !== 1 || Number(results[1]?.meta?.changes || 0) !== 1) {
     return fail("invalid_reset_code", "Codul de resetare nu mai este valid.", 409);
   }
-  return json({ ok: true, message: "PIN schimbat. Conectează-te folosind codul contului și noul PIN." },
+  return json({ ok: true, message: phoneNumber
+    ? "PIN schimbat. Conectează-te cu numărul de telefon și noul PIN."
+    : "PIN schimbat. Conectează-te cu codul vechi al contului și noul PIN." },
     200, { "Set-Cookie": sessionCookie(request, "", 0) });
 }
 async function logout(request: Request, env: Env): Promise<Response> {

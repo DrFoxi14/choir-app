@@ -338,13 +338,17 @@ $("#activate-form").addEventListener("submit", async (event) => {
     const data = await requestJSON("/api/auth/activate", "POST", {
       code: $("#activation-code").value,
       displayName: $("#activation-name").value,
+      phone: $("#activation-phone").value,
       pin
     });
     event.currentTarget.reset();
     enterApp(data.user);
-    showIssuedCode(data.loginCode,
-      "Contul a fost activat. Notează codul contului; PIN-ul nu îl înlocuiește. Codul contului este necesar la conectările viitoare.",
-      "Codul tău de conectare");
+    if (data.phoneLoginEnabled) {
+      hideIssuedCode();
+      showNotice("Cont activat. De acum te conectezi cu numărul de telefon și PIN-ul. Nu trebuie să memorezi niciun cod de cont.", "success");
+    } else {
+      showIssuedCode(data.loginCode, data.message, "Codul tău de conectare");
+    }
   } catch (error) {
     setMessage("#activate-message", error.message, "error");
   } finally {
