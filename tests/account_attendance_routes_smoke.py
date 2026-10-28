@@ -34,8 +34,8 @@ assert 'id="preferences-form"' not in home, "Palette form should be on /account"
 
 # Attendance is now an independently addressable page, and exports remain client-side.
 assert 'id="attendance-form"' in attendance
-assert 'id="attendance-export-xlsx"' in attendance_js
-assert 'id="attendance-export-md"' in attendance_js
+assert 'id="attendance-export-xlsx"' in attendance
+assert 'id="attendance-export-md"' in attendance
 assert 'downloadAttendanceXlsx(matrix)' in attendance_js
 assert 'downloadAttendanceMarkdown(matrix)' in attendance_js
 assert '"/api/conductor/attendance"' in attendance_js
