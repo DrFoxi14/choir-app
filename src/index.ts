@@ -36,6 +36,7 @@ interface UserPinRow {
 }
 interface ActivationRow {
   id: string; choir_id: string; intended_role: Role; voice_part: VoicePart | null;
+  intended_phone_hash: string | null;
 }
 interface RateRow { attempts: number; window_started_at: number; }
 
@@ -386,13 +387,25 @@ async function activateAccount(request: Request, env: Env): Promise<Response> {
   const codeHash = await sha256(code);
   const now = new Date().toISOString();
   const candidateResult = await env.DB.prepare(
-    "SELECT id, choir_id, intended_role, voice_part FROM activation_codes " +
-    "WHERE code_hash = ? AND choir_id = ? AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ? LIMIT 1"
+    "SELECT a.id, a.choir_id, a.intended_role, a.voice_part, " +
+    "(SELECT json_extract(l.metadata_json, '$.phoneHash') FROM audit_logs l " +
+    "WHERE l.choir_id = a.choir_id AND l.target_type = 'activation_code' " +
+    "AND l.target_id = a.id AND l.action = 'activation_code.created' " +
+    "ORDER BY l.created_at DESC LIMIT 1) AS intended_phone_hash " +
+    "FROM activation_codes a WHERE a.code_hash = ? AND a.choir_id = ? " +
+    "AND a.used_at IS NULL AND a.revoked_at IS NULL AND a.expires_at > ? LIMIT 1"
   ).bind(codeHash, choir.id, now).all<ActivationRow>();
   const candidate = candidateResult.results?.[0];
   if (!candidate || !isRole(candidate.intended_role) ||
       (candidate.intended_role === "member" && !isVoicePart(candidate.voice_part))) {
     return fail("invalid_activation_code", "Codul nu este valid, a expirat sau a fost deja folosit.", 400);
+  }
+  if (!candidate.intended_phone_hash) {
+    return fail("invitation_phone_required", "Această invitație a fost creată înainte de asocierea numărului de telefon. Cere dirijorului o invitație nouă.", 409);
+  }
+  const submittedPhoneHash = await hmacHex(env.AUTH_SECRET || "", "activation-phone|" + phoneNumber);
+  if (!constantTimeEqual(candidate.intended_phone_hash, submittedPhoneHash)) {
+    return fail("phone_mismatch", "Numărul de telefon nu corespunde invitației. Verifică numărul sau contactează dirijorul.", 409);
   }
   const userId = crypto.randomUUID();
   const membershipId = crypto.randomUUID();
@@ -564,15 +577,66 @@ async function resetAccess(request: Request, env: Env): Promise<Response> {
     : "PIN schimbat. Conectează-te cu codul vechi al contului și noul PIN." },
     200, { "Set-Cookie": sessionCookie(request, "", 0) });
 }
+async function issuePhoneChangeCode(request: Request, env: Env, targetId: string): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot emite coduri pentru schimbarea numerelor.", 403);
+  const target = await manageableMember(env, current, targetId);
+  if (target instanceof Response) return target;
+  const body = await readJson(request);
+  if (!body) return fail("invalid_request", "Cerere invalidă.", 400);
+  const phoneNumber = normalizePhone(body.phone);
+  if (!phoneNumber) {
+    return fail("invalid_phone", "Introdu un număr de telefon mobil românesc valid.", 400);
+  }
+  if (!(await allowAttempt(request, env, "phone-change-issue-ip", 12)) ||
+      !(await allowAttempt(request, env, "phone-change-issue-target", 5, targetId))) {
+    return fail("rate_limited", "Au fost emise prea multe coduri. Reîncearcă peste 15 minute.", 429);
+  }
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const existing = await env.DB.prepare(
+    "SELECT id FROM users WHERE email_normalized = ? AND id <> ? LIMIT 1"
+  ).bind(phoneNumber, targetId).all<{ id: string }>();
+  if (existing.results?.length) {
+    return fail("phone_in_use", "Numărul acesta este deja asociat altui cont.", 409);
+  }
+  const code = randomCode(16);
+  const id = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 30 * 60000).toISOString();
+  const codeHash = await sha256(normalizeCode(code));
+  const phoneHash = await hmacHex(env.AUTH_SECRET || "", "phone-change|" + phoneNumber);
+  const statements = [
+    env.DB.prepare(
+      "UPDATE access_reset_codes SET revoked_at = ? WHERE user_id = ? AND choir_id = ? " +
+      "AND used_at IS NULL AND revoked_at IS NULL AND id IN " +
+      "(SELECT target_id FROM audit_logs WHERE target_type = 'phone_change_code' AND action = 'account.phone_change_code.created')"
+    ).bind(now, targetId, current.choirId),
+    env.DB.prepare(
+      "INSERT INTO access_reset_codes (id, choir_id, user_id, code_hash, created_by_user_id, expires_at) " +
+      "VALUES (?, ?, ?, ?, ?, ?)"
+    ).bind(id, current.choirId, targetId, codeHash, current.userId, expiresAt),
+    env.DB.prepare(
+      "INSERT INTO audit_logs (id, choir_id, actor_user_id, action, target_type, target_id, metadata_json) " +
+      "VALUES (?, ?, ?, 'account.phone_change_code.created', 'phone_change_code', ?, ?)"
+    ).bind(crypto.randomUUID(), current.choirId, current.userId, id, JSON.stringify({ phoneHash }))
+  ];
+  await env.DB.batch(statements);
+  return json({
+    code: formatCode(code), expiresAt,
+    message: "Codul este legat de numărul de telefon introdus, este valabil 30 de minute și poate fi folosit o singură dată. Transmite-l doar membrului respectiv."
+  }, 201);
+}
 async function updateAccountPhone(request: Request, env: Env): Promise<Response> {
   const current = await requireSession(request, env);
   if (current instanceof Response) return current;
   const body = await readJson(request);
   if (!body) return fail("invalid_request", "Cerere invalidă.", 400);
   const phoneNumber = normalizePhone(body.phone);
+  const phoneChangeCode = typeof body.code === "string" ? normalizeCode(body.code) : "";
   const pin = body.pin;
-  if (!phoneNumber || !validPin(pin)) {
-    return fail("invalid_fields", "Introdu un număr de mobil românesc valid și PIN-ul actual din 6 cifre.", 400);
+  if (!phoneNumber || phoneChangeCode.length !== 16 || !validPin(pin)) {
+    return fail("invalid_fields", "Introdu numărul de telefon, codul primit de la dirijor și PIN-ul actual din 6 cifre.", 400);
   }
   if (!(await allowAttempt(request, env, "phone-change-ip", 12)) ||
       !(await allowAttempt(request, env, "phone-change-account", 5, current.userId))) {
@@ -587,29 +651,62 @@ async function updateAccountPhone(request: Request, env: Env): Promise<Response>
   if (!account?.pin_hash || !constantTimeEqual(calculatedHash, account.pin_hash)) {
     return fail("invalid_pin", "PIN-ul actual nu este corect.", 401);
   }
+  const codeHash = await sha256(phoneChangeCode);
+  const codeResult = await env.DB.prepare(
+    "SELECT r.id AS resetId, json_extract(l.metadata_json, '$.phoneHash') AS phoneHash " +
+    "FROM access_reset_codes r JOIN audit_logs l ON l.target_id = r.id " +
+    "AND l.target_type = 'phone_change_code' AND l.action = 'account.phone_change_code.created' " +
+    "WHERE r.code_hash = ? AND r.user_id = ? AND r.choir_id = ? " +
+    "AND r.used_at IS NULL AND r.revoked_at IS NULL AND r.expires_at > ? LIMIT 1"
+  ).bind(codeHash, current.userId, current.choirId, new Date().toISOString())
+    .all<{ resetId: string; phoneHash: string | null }>();
+  const authorizedCode = codeResult.results?.[0];
+  if (!authorizedCode) {
+    return fail("invalid_phone_change_code", "Codul nu este valid, a expirat sau a fost deja folosit.", 400);
+  }
+  const expectedPhoneHash = await hmacHex(env.AUTH_SECRET || "", "phone-change|" + phoneNumber);
+  if (!authorizedCode.phoneHash || !constantTimeEqual(authorizedCode.phoneHash, expectedPhoneHash)) {
+    return fail("phone_mismatch", "Numărul nu corespunde codului de schimbare primit de la dirijor.", 409);
+  }
   const existing = await env.DB.prepare(
     "SELECT id FROM users WHERE email_normalized = ? AND id <> ? LIMIT 1"
   ).bind(phoneNumber, current.userId).all<{ id: string }>();
   if (existing.results?.length) {
     return fail("phone_in_use", "Numărul acesta este deja asociat altui cont.", 409);
   }
-  let result: D1Result;
+  const usedAt = new Date().toISOString() + ":" + randomHex(8);
+  let results: D1Result[];
   try {
-    result = await env.DB.prepare(
-      "UPDATE users SET email_normalized = ?, updated_at = ? " +
-      "WHERE id = ? AND status = 'active' AND EXISTS " +
-      "(SELECT 1 FROM choir_memberships WHERE user_id = ? AND choir_id = ? AND status = 'active') " +
-      "AND NOT EXISTS (SELECT 1 FROM users WHERE email_normalized = ? AND id <> ?)"
-    ).bind(phoneNumber, new Date().toISOString(), current.userId, current.userId,
-      current.choirId, phoneNumber, current.userId).run();
+    results = await env.DB.batch([
+      env.DB.prepare(
+        "UPDATE access_reset_codes SET used_at = ?, used_by_user_id = ? " +
+        "WHERE id = ? AND user_id = ? AND choir_id = ? AND code_hash = ? " +
+        "AND used_at IS NULL AND revoked_at IS NULL AND expires_at > ? " +
+        "AND NOT EXISTS (SELECT 1 FROM users WHERE email_normalized = ? AND id <> ?)"
+      ).bind(usedAt, current.userId, authorizedCode.resetId, current.userId, current.choirId,
+        codeHash, new Date().toISOString(), phoneNumber, current.userId),
+      env.DB.prepare(
+        "UPDATE users SET email_normalized = ?, updated_at = ? WHERE id = ? AND status = 'active' " +
+        "AND EXISTS (SELECT 1 FROM choir_memberships WHERE user_id = ? AND choir_id = ? AND status = 'active') " +
+        "AND EXISTS (SELECT 1 FROM access_reset_codes WHERE id = ? AND used_at = ? AND used_by_user_id = ?) " +
+        "AND NOT EXISTS (SELECT 1 FROM users WHERE email_normalized = ? AND id <> ?)"
+      ).bind(phoneNumber, new Date().toISOString(), current.userId, current.userId, current.choirId,
+        authorizedCode.resetId, usedAt, current.userId, phoneNumber, current.userId),
+      env.DB.prepare(
+        "INSERT INTO audit_logs (id, choir_id, actor_user_id, action, target_type, target_id, metadata_json) " +
+        "SELECT ?, ?, ?, 'account.phone.updated', 'user', ?, ? " +
+        "WHERE EXISTS (SELECT 1 FROM users WHERE id = ? AND email_normalized = ?) " +
+        "AND EXISTS (SELECT 1 FROM access_reset_codes WHERE id = ? AND used_at = ? AND used_by_user_id = ?)"
+      ).bind(crypto.randomUUID(), current.choirId, current.userId, current.userId,
+        JSON.stringify({ phoneUpdated: true }), current.userId, phoneNumber,
+        authorizedCode.resetId, usedAt, current.userId)
+    ]);
   } catch {
-    return fail("phone_in_use", "Nu am putut salva numărul. Verifică dacă nu este deja folosit de alt cont.", 409);
+    return fail("phone_update_failed", "Nu am putut salva numărul. Codul poate fi deja folosit sau numărul este ocupat.", 409);
   }
-  if (Number(result.meta?.changes || 0) !== 1) {
-    return fail("phone_in_use", "Numărul acesta este deja asociat altui cont sau contul nu mai este activ.", 409);
+  if (Number(results[0]?.meta?.changes || 0) !== 1 || Number(results[1]?.meta?.changes || 0) !== 1) {
+    return fail("phone_update_failed", "Nu am putut salva numărul. Cere dirijorului un cod nou și verifică numărul.", 409);
   }
-  await recordAudit(env, current.choirId, current.userId, "account.phone.updated", "user", current.userId,
-    { phoneUpdated: true });
   return json({ ok: true, phoneNumber, message: "Numărul de telefon a fost actualizat." });
 }
 async function logout(request: Request, env: Env): Promise<Response> {
@@ -688,6 +785,7 @@ async function createInvitation(request: Request, env: Env): Promise<Response> {
   if (!body) return fail("invalid_request", "Cerere invalidă.", 400);
   const role = body.role;
   const voicePart = body.voicePart;
+  const phoneNumber = normalizePhone(body.phone);
   if (role !== "member" && role !== "conductor") {
     return fail("invalid_role", "Rol invalid.", 400);
   }
@@ -700,7 +798,17 @@ async function createInvitation(request: Request, env: Env): Promise<Response> {
   if (role === "conductor" && voicePart !== null && voicePart !== undefined && !isVoicePart(voicePart)) {
     return fail("invalid_voice", "Voce invalidă.", 400);
   }
+  if (!phoneNumber) {
+    return fail("invalid_phone", "Introdu un număr de telefon mobil românesc valid pentru persoana invitată.", 400);
+  }
   if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const existingPhone = await env.DB.prepare(
+    "SELECT id FROM users WHERE email_normalized = ? LIMIT 1"
+  ).bind(phoneNumber).all<{ id: string }>();
+  if (existingPhone.results?.length) {
+    return fail("phone_in_use", "Numărul acesta este deja asociat unui cont. Cere ajutorul dirijorului pentru contul existent.", 409);
+  }
+  const phoneHash = await hmacHex(env.AUTH_SECRET || "", "activation-phone|" + phoneNumber);
   const code = randomCode(16);
   const codeHash = await sha256(code);
   const id = crypto.randomUUID();
@@ -714,13 +822,13 @@ async function createInvitation(request: Request, env: Env): Promise<Response> {
     env.DB.prepare(
       "INSERT INTO audit_logs (id, choir_id, actor_user_id, action, target_type, target_id, metadata_json) " +
       "VALUES (?, ?, ?, 'activation_code.created', 'activation_code', ?, ?)"
-    ).bind(crypto.randomUUID(), current.choirId, current.userId, id, JSON.stringify({ role, voicePart: voice }))
+    ).bind(crypto.randomUUID(), current.choirId, current.userId, id, JSON.stringify({ role, voicePart: voice, phoneHash }))
   ];
   await env.DB.batch(statements);
   return json({
     invitation: { id, role, voicePart: voice, expiresAt },
     code: formatCode(code),
-    message: "Codul este afișat o singură dată. Copiază-l și transmite-l persoanei respective."
+    message: "Codul este valabil 7 zile și este legat de numărul introdus. Copiază-l și transmite-l numai persoanei respective."
   }, 201);
 }
 async function revokeInvitation(request: Request, env: Env, invitationId: string): Promise<Response> {
@@ -843,6 +951,8 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === "POST" && revokeMatch) return revokeInvitation(request, env, revokeMatch[1]);
   const resetMatch = path.match(/^\/api\/conductor\/members\/([a-f0-9-]{36})\/reset$/);
   if (request.method === "POST" && resetMatch) return issueResetCode(request, env, resetMatch[1]);
+  const phoneChangeCodeMatch = path.match(/^\/api\/conductor\/members\/([a-f0-9-]{36})\/phone-change-code$/);
+  if (request.method === "POST" && phoneChangeCodeMatch) return issuePhoneChangeCode(request, env, phoneChangeCodeMatch[1]);
   const renewMatch = path.match(/^\/api\/conductor\/members\/([a-f0-9-]{36})\/renew-login-code$/);
   if (request.method === "POST" && renewMatch) return renewLoginCode(request, env, renewMatch[1]);
   return fail("not_found", "Resursa nu a fost găsită.", 404);

@@ -230,12 +230,31 @@ function renderMembers(members, actorRole) {
       renewButton.className = "secondary-button";
       renewButton.textContent = "Cod cont nou";
       renewButton.addEventListener("click", () => runMemberAction(member, "renew-login-code"));
-      actions.append(resetButton, renewButton);
+      const phoneButton = document.createElement("button");
+      phoneButton.type = "button";
+      phoneButton.className = "secondary-button";
+      phoneButton.textContent = "Cod schimbare telefon";
+      phoneButton.addEventListener("click", () => runPhoneChangeAction(member));
+      actions.append(resetButton, renewButton, phoneButton);
       card.append(actions);
     }
     list.append(card);
   }
 }
+async function runPhoneChangeAction(member) {
+  const phone = window.prompt("Introdu numărul de telefon nou pentru " + member.displayName + " (de ex. 0754 322 323):");
+  if (phone === null || !phone.trim()) return;
+  try {
+    const response = await requestJSON(
+      "/api/conductor/members/" + encodeURIComponent(member.id) + "/phone-change-code",
+      "POST", { phone }
+    );
+    showIssuedCode(response.code, response.message, "Cod schimbare telefon · " + member.displayName);
+  } catch (error) {
+    showNotice(error.message, "error");
+  }
+}
+
 function renderInvitations(invitations, actorRole) {
   const list = $("#invitation-list");
   list.replaceChildren();
@@ -408,11 +427,13 @@ $("#phone-form").addEventListener("submit", async (event) => {
   try {
     const data = await requestJSON("/api/account/phone", "POST", {
       phone: $("#account-phone").value,
+      code: $("#account-phone-code").value,
       pin: $("#account-phone-pin").value
     });
     state.user.phoneNumber = data.phoneNumber;
     $("#account-phone").value = data.phoneNumber;
     $("#account-phone-pin").value = "";
+    $("#account-phone-code").value = "";
     $("#account-current-phone").textContent = "Număr de telefon salvat: " + data.phoneNumber;
     setMessage("#phone-message", data.message || "Numărul a fost salvat.", "success");
   } catch (error) {
@@ -447,7 +468,8 @@ $("#invitation-form").addEventListener("submit", async (event) => {
   try {
     const data = await requestJSON("/api/conductor/invitations", "POST", {
       role,
-      voicePart: role === "member" ? $("#invitation-voice").value : null
+      voicePart: role === "member" ? $("#invitation-voice").value : null,
+      phone: $("#invitation-phone").value
     });
     setMessage("#invitation-message", "Invitație creată.", "success");
     showIssuedCode(data.code, data.message, role === "conductor" ? "Cod de invitație pentru dirijor" : "Cod de invitație pentru membru");
