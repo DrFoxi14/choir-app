@@ -43,6 +43,24 @@ def main() -> None:
     assert 'path === "/api/conductor/contacts"' in WORKER
     assert "phoneVerificationMatch" in WORKER
 
+    # The dedicated UI shows a badge, but exposes WhatsApp actions only for verified numbers.
+    INVITATION_JS = (ROOT / "public" / "invitation.js").read_text(encoding="utf-8")
+    verified_branch = INVITATION_JS.index("if (phone && verified) {")
+    whatsapp_branch = INVITATION_JS.index('whatsApp.href = "https://wa.me/"', verified_branch)
+    end_verified_branch = INVITATION_JS.index('} else {', whatsapp_branch)
+    assert verified_branch < whatsapp_branch < end_verified_branch
+    assert "phoneVerifiedAt" in INVITATION_JS
+    assert "Confirmă numărul" in INVITATION_JS
+    assert "Introdu PIN-ul tău din 6 cifre" in INVITATION_JS
+
+    MAIN_HTML = (ROOT / "public" / "index.html").read_text(encoding="utf-8")
+    MAIN_JS = (ROOT / "public" / "app.js").read_text(encoding="utf-8")
+    for old_section in ['aria-labelledby="invite-title"', 'aria-labelledby="members-title"', 'aria-labelledby="invitations-title"']:
+        assert old_section not in MAIN_HTML, f"Admin section was not moved off main page: {old_section}"
+    for old_selector in ['$("#invitation-form")', '$("#member-list")', '$("#invitation-list")']:
+        assert old_selector not in MAIN_JS, f"Main page still references moved UI: {old_selector}"
+
+
 
 if __name__ == "__main__":
     main()
