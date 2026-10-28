@@ -48,8 +48,8 @@
       <h2 id="login-title">Conectare</h2>
       <p class="muted">Conectează-te cu numărul de telefon și PIN-ul. Conturile mai vechi pot folosi în continuare codul contului.</p>
       <form id="login-form" class="form-stack">
-        <label for="login-code">Număr de telefon</label>
-        <input id="login-code" name="loginCode" type="tel" inputmode="tel" autocomplete="username" placeholder="0754 322 323" required>
+        <label for="login-code">Număr de telefon (sau codul vechi al contului)</label>
+        <input id="login-code" name="loginCode" type="text" inputmode="text" autocomplete="username" placeholder="0754 322 323" required>
         <label for="login-pin">PIN din 6 cifre</label>
         <input id="login-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required>
         <button class="primary-button" type="submit">Conectare</button>
@@ -79,8 +79,8 @@
         <summary>Am uitat PIN-ul</summary>
         <p class="muted compact">Cere unui dirijor un cod de resetare. Folosește numărul de telefon asociat contului; conturile mai vechi pot folosi codul contului.</p>
         <form id="reset-form" class="form-stack">
-          <label for="reset-login-code">Număr de telefon</label>
-          <input id="reset-login-code" name="loginCode" type="tel" inputmode="tel" autocomplete="tel" placeholder="0754 322 323" required>
+          <label for="reset-login-code">Număr de telefon (sau codul vechi al contului)</label>
+          <input id="reset-login-code" name="loginCode" type="text" inputmode="text" autocomplete="username" placeholder="0754 322 323" required>
           <label for="reset-code">Cod de resetare primit de la dirijor</label>
           <input id="reset-code" name="resetCode" autocapitalize="characters" spellcheck="false" required>
           <label for="reset-pin">PIN nou din 6 cifre</label>
