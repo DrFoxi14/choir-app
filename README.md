@@ -83,5 +83,6 @@ The current Worker name is **cor**, with the expected URL **https://cor.taborora
 - Use a supported browser with HTTPS. All state-changing API endpoints require a same-origin Origin header.
 - Rate-limit buckets use keyed HMAC identifiers rather than storing raw client IP addresses or account codes.
 - Conductors can invite members. Only the owner can issue conductor invitations. Non-owner conductors cannot reset or replace another conductor's access codes.
+- `/invitation` is a dedicated conductor contacts/invitations page. Contact numbers are returned only from a conductor-only POST endpoint after re-entering the six-digit PIN, rate-limited and audited; regular catalog/list endpoints never return member phone numbers.
 - Catalog queries are scoped to the resolved choir. Asset object keys and URLs are not returned by the API. Private media signing/streaming, file uploads, song publishing tools, additional monitoring, and end-to-end tests remain future work.
 - Secrets, private access codes, real member information, and private media must never be committed to the repository.
