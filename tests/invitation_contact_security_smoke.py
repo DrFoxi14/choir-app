@@ -70,6 +70,9 @@ def main() -> None:
     assert 'path === "/api/legal/accept"' in WORKER
     require_session = function_body("requireSession", "function isConductor")
     assert "hasCurrentLegalAcceptance" in require_session
+    bootstrap = function_body("bootstrapOwner", "async function activateAccount")
+    assert "body.acceptedLegal !== true" in bootstrap
+    assert "acceptedVia: \"owner_bootstrap\"" in bootstrap
     activation = function_body("activateAccount", "async function login")
     assert "body.acceptedLegal !== true" in activation
     assert "acceptedVia: \"account_activation\"" in activation
