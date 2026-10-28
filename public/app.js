@@ -57,6 +57,13 @@ function setMessage(selector, message, kind = "") {
   element.classList.toggle("message-error", kind === "error");
   element.classList.toggle("message-success", kind === "success");
 }
+async function applySavedAccentTheme() {
+  try {
+    const data = await requestJSON("/api/account/preferences");
+    const allowed = ["ocean", "violet", "emerald", "rose", "amber", "teal", "slate", "berry"];
+    document.documentElement.dataset.accentTheme = allowed.includes(data.accentTheme) ? data.accentTheme : "ocean";
+  } catch { /* Keep the accessible default accent when preferences are unavailable. */ }
+}
 function formatDate(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString("ro-RO", {
@@ -133,6 +140,7 @@ function enterApp(user) {
   $("#user-summary").classList.remove("hidden");
   $("#logout-button").classList.remove("hidden");
   $("#account-settings-toggle").classList.remove("hidden");
+  void applySavedAccentTheme();
   if (user.role === "owner" || user.role === "conductor") {
     showOnly("conductor");
     $("#conductor-role-badge").textContent = roleNames[user.role];
