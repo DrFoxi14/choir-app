@@ -10,14 +10,16 @@ Source repository for Choir App — temporarily public during initial developmen
 - A dedicated `/invitation` page for conductor invitations, member contacts, invitation revocation, PIN reset codes, and account-code renewal.
 - A conductor-confirmed phone verification badge. WhatsApp actions are hidden until the number is manually verified; changing the phone number clears verification.
 - D1 records scoped to the current choir; the schema supports multiple choirs.
+- Account-level accent palettes stored in D1, with eight curated colors.
+- Conductor-only attendance recording and date-range reports exported locally as real `.xlsx` or `.md` downloads.
 
 ## Current implementation status
 
 The current feature branch adds account activation, sign-in, signed-out state, session validation, role-gated conductor endpoints, single-use expiring invitations, account-code renewal, PIN reset, HMAC-keyed rate-limit records, audit events, and a conductor dashboard.
 
-**This branch is not yet production-ready.** Before enabling account access, apply migrations **migrations/0002_member_auth_and_conductors.sql** and **migrations/0003_member_phone_verification.sql**, configure the Worker secrets described below, and run the CI checks. Then complete a real browser test of bootstrap, member activation, conductor invitations, login, logout, rate limits, role boundaries, phone verification, and PIN reset.
+**This branch is not yet production-ready.** Before enabling account access, apply migrations **0002**, **0003**, and **0004_preferences_attendance.sql**, configure the Worker secrets described below, and run the CI checks. The new **0004** migration creates only relational D1 tables; it does not require R2. Then complete a real browser test of bootstrap, member activation, conductor invitations, login, logout, rate limits, role boundaries, phone verification, and PIN reset.
 
-The audio, PDF, and video delivery pipeline is not implemented yet. The current UI deliberately shows these formats as unavailable. The API never returns storage object keys or media URLs. R2 is not required for the authentication work and should remain unconfigured until a private-media plan is ready.
+The audio, PDF, and video delivery pipeline is not implemented yet. The current UI deliberately shows these formats as unavailable. The API never returns storage object keys or media URLs. **R2 is not needed for account colors, attendance records, or the Excel/Markdown exports**: preferences and attendance stay in D1, while `.xlsx` and `.md` files are generated in the conductor’s browser and downloaded directly. Keep R2 unconfigured until a private-media plan is ready.
 
 ## Stack
 
