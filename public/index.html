@@ -145,51 +145,14 @@
         </div>
         <span id="conductor-role-badge" class="voice-badge">Dirijor</span>
       </div>
-      <p class="muted">Gestionează invitațiile, membrii și accesul. Codurile generate sunt afișate o singură dată; transmite-le direct persoanei pentru care au fost create.</p>
-      <p><a class="primary-button invitation-route-link" href="/invitation">Deschide pagina de invitații și contacte</a></p>
+      <p class="muted">Administrează repertoriul aici. Invitațiile și lista privată de contacte sunt într-o pagină separată, disponibilă numai dirijorilor.</p>
+      <p><a class="primary-button invitation-route-link" href="/invitation">Deschide invitații, contacte și membri</a></p>
 
-      <section class="panel dashboard-section" aria-labelledby="invite-title">
-        <h3 id="invite-title">Invită un membru sau un dirijor</h3>
-        <form id="invitation-form" class="form-stack">
-          <label for="invitation-role">Tipul contului</label>
-          <select id="invitation-role" name="role">
-            <option value="member">Membru al corului</option>
-            <option id="conductor-invite-option" value="conductor" hidden>Dirijor</option>
-          </select>
-          <label for="invitation-phone">Numărul de telefon al persoanei</label>
-          <input id="invitation-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0754 322 323" required>
-          <div id="invitation-voice-group">
-            <label for="invitation-voice">Vocea membrului</label>
-            <select id="invitation-voice" name="voicePart" required>
-              <option value="S">Sopran</option>
-              <option value="A">Alto</option>
-              <option value="T">Tenor</option>
-              <option value="B">Bas</option>
-            </select>
-          </div>
-          <button class="primary-button" type="submit">Generează cod de invitație</button>
-          <p class="muted compact">Codul este valabil 7 zile, poate fi folosit o singură dată și funcționează doar cu numărul introdus aici.</p>
-          <p id="invitation-message" class="form-message" role="status"></p>
-        </form>
-      </section>
+      
 
-      <section class="panel dashboard-section" aria-labelledby="members-title">
-        <div class="section-heading">
-          <h3 id="members-title">Membrii corului</h3>
-          <button id="refresh-members" class="secondary-button" type="button">Reîncarcă</button>
-        </div>
-        <p id="members-message" class="muted compact" role="status"></p>
-        <div id="member-list" class="managed-list"></div>
-      </section>
+      
 
-      <section class="panel dashboard-section" aria-labelledby="invitations-title">
-        <div class="section-heading">
-          <h3 id="invitations-title">Invitații active</h3>
-          <button id="refresh-invitations" class="secondary-button" type="button">Reîncarcă</button>
-        </div>
-        <p id="invitations-message" class="muted compact" role="status"></p>
-        <div id="invitation-list" class="managed-list"></div>
-      </section>
+      
 
       <section class="panel dashboard-section" aria-labelledby="conductor-catalog-title">
         <h3 id="conductor-catalog-title">Previzualizare repertoriu</h3>
