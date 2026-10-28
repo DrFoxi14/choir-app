@@ -7,14 +7,15 @@ Source repository for Choir App — temporarily public during initial developmen
 - Mobile-first song catalog for choir members, with an account-linked voice part (Soprano, Alto, Tenor, Bass).
 - Separate member and conductor roles.
 - One main owner account plus individually invited conductor accounts. The owner can invite other conductors; conductors can invite members.
-- Conductor tools for active-member lists, invitation revocation, PIN reset codes, and account-code renewal.
+- A dedicated `/invitation` page for conductor invitations, member contacts, invitation revocation, PIN reset codes, and account-code renewal.
+- A conductor-confirmed phone verification badge. WhatsApp actions are hidden until the number is manually verified; changing the phone number clears verification.
 - D1 records scoped to the current choir; the schema supports multiple choirs.
 
 ## Current implementation status
 
 The current feature branch adds account activation, sign-in, signed-out state, session validation, role-gated conductor endpoints, single-use expiring invitations, account-code renewal, PIN reset, HMAC-keyed rate-limit records, audit events, and a conductor dashboard.
 
-**This branch is not yet production-ready.** Before merging/deploying it, apply migration **migrations/0002_member_auth_and_conductors.sql**, configure the Worker secrets described below, and run the CI checks. Then complete a real browser test of bootstrap, member activation, conductor invitations, login, logout, rate limits, role boundaries, and PIN reset.
+**This branch is not yet production-ready.** Before enabling account access, apply migrations **migrations/0002_member_auth_and_conductors.sql** and **migrations/0003_member_phone_verification.sql**, configure the Worker secrets described below, and run the CI checks. Then complete a real browser test of bootstrap, member activation, conductor invitations, login, logout, rate limits, role boundaries, phone verification, and PIN reset.
 
 The audio, PDF, and video delivery pipeline is not implemented yet. The current UI deliberately shows these formats as unavailable. The API never returns storage object keys or media URLs. R2 is not required for the authentication work and should remain unconfigured until a private-media plan is ready.
 
@@ -55,7 +56,7 @@ The existing database is named **choir-app-db**. Apply both migrations using Wra
 
 **npx wrangler d1 migrations apply choir-app-db --remote**
 
-Migration 0001 uses IF NOT EXISTS/INSERT OR IGNORE for its schema setup, so it is safe to apply if its SQL was previously run manually in the D1 dashboard but Wrangler has not yet recorded the migration. Prefer the migration command over manually pasting migration 0002 into the dashboard, so Wrangler can record the migration and avoid re-applying it later.
+Migration 0001 uses IF NOT EXISTS/INSERT OR IGNORE for its schema setup, so it is safe to apply if its SQL was previously run manually in the D1 dashboard but Wrangler has not yet recorded the migration. Apply migrations 0002 and 0003 as well; migration 0003 adds conductor-confirmed phone verification fields. Prefer the migration command over manually pasting later migrations into the dashboard, so Wrangler can record the migrations and avoid re-applying them later.
 
 ### Create the first account
 
@@ -84,5 +85,6 @@ The current Worker name is **cor**, with the expected URL **https://cor.taborora
 - Rate-limit buckets use keyed HMAC identifiers rather than storing raw client IP addresses or account codes.
 - Conductors can invite members. Only the owner can issue conductor invitations. Non-owner conductors cannot reset or replace another conductor's access codes.
 - `/invitation` is a dedicated conductor contacts/invitations page. Contact numbers are returned only from a conductor-only POST endpoint after re-entering the six-digit PIN, rate-limited and audited; regular catalog/list endpoints never return member phone numbers.
+- The `phone_verified_at` flag is stored per choir membership. An authorized conductor can set it only after re-entering their PIN; this is a manual confirmation, not verification by WhatsApp/SMS. WhatsApp links appear only when verified. Changing a member phone clears verification across the account's choir memberships.
 - Catalog queries are scoped to the resolved choir. Asset object keys and URLs are not returned by the API. Private media signing/streaming, file uploads, song publishing tools, additional monitoring, and end-to-end tests remain future work.
 - Secrets, private access codes, real member information, and private media must never be committed to the repository.
