@@ -226,6 +226,7 @@ $("#login-form").addEventListener("submit", async (event) => {
   }
 });
 $("#activate-form").addEventListener("submit", async (event) => {
+  const form = event.currentTarget;
   event.preventDefault();
   const pin = $("#activation-pin").value;
   if (pin !== $("#activation-pin-confirm").value) {
@@ -243,7 +244,7 @@ $("#activate-form").addEventListener("submit", async (event) => {
       pin,
       acceptedLegal: $("#activation-legal-accept").checked
     });
-    event.currentTarget.reset();
+    form.reset();
     enterApp(data.user);
     if (data.phoneLoginEnabled) {
       hideIssuedCode();
@@ -260,6 +261,7 @@ $("#activate-form").addEventListener("submit", async (event) => {
   }
 });
 $("#reset-form").addEventListener("submit", async (event) => {
+  const form = event.currentTarget;
   event.preventDefault();
   if ($("#reset-pin").value !== $("#reset-pin-confirm").value) {
     setMessage("#reset-message", "Cele două valori PIN nu coincid.", "error");
@@ -274,7 +276,7 @@ $("#reset-form").addEventListener("submit", async (event) => {
       resetCode: $("#reset-code").value,
       pin: $("#reset-pin").value
     });
-    event.currentTarget.reset();
+    form.reset();
     setMessage("#reset-message", data.message || "PIN actualizat. Conectează-te din nou.", "success");
     $("#login-code").value = $("#reset-login-code").value;
   } catch (error) {
@@ -336,6 +338,7 @@ $("#hide-code-button").addEventListener("click", hideIssuedCode);
 $("#conductor-voice").addEventListener("change", () => loadSongs($("#conductor-voice").value, true));
 
 $("#legal-acceptance-form").addEventListener("submit", async (event) => {
+  const form = event.currentTarget;
   event.preventDefault();
   const button = event.currentTarget.querySelector("button[type=submit]");
   if (!$("#existing-legal-accept").checked) return;
@@ -345,7 +348,7 @@ $("#legal-acceptance-form").addEventListener("submit", async (event) => {
     await requestJSON("/api/legal/accept", "POST", { acceptedLegal: true });
     const user = state.pendingLegalUser;
     state.pendingLegalUser = null;
-    event.currentTarget.reset();
+    form.reset();
     if (user) enterApp(user);
     else await start();
   } catch (error) {
