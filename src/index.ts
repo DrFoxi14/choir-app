@@ -749,6 +749,50 @@ async function listSongs(request: Request, env: Env): Promise<Response> {
   // Asset keys and storage URLs are intentionally never exposed by the catalog API.
   return json({ songs: result.results ?? [], voice });
 }
+async function listMemberContacts(request: Request, env: Env): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) {
+    return fail("forbidden", "Această pagină este disponibilă doar dirijorilor.", 403);
+  }
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+
+  const body = await readJson(request);
+  if (!body || !validPin(body.pin)) {
+    return fail("reauthentication_required", "Introdu PIN-ul de 6 cifre pentru a vedea numerele de telefon.", 401);
+  }
+  if (!(await allowAttempt(request, env, "conductor-contacts-ip", 24)) ||
+      !(await allowAttempt(request, env, "conductor-contacts-user", 12, await sha256(current.userId)))) {
+    return fail("rate_limited", "Prea multe încercări. Reîncearcă peste 15 minute.", 429);
+  }
+
+  const credentialResult = await env.DB.prepare(
+    "SELECT pin_salt, pin_hash FROM users WHERE id = ? AND status = 'active' LIMIT 1"
+  ).bind(current.userId).all<{ pin_salt: string; pin_hash: string }>();
+  const credential = credentialResult.results?.[0];
+  const calculatedHash = await derivePinHash(
+    body.pin,
+    credential?.pin_salt || "00000000000000000000000000000000"
+  );
+  if (!credential?.pin_hash || !constantTimeEqual(calculatedHash, credential.pin_hash)) {
+    return fail("invalid_pin", "PIN incorect. Numerele de telefon rămân blocate.", 401);
+  }
+
+  const result = await env.DB.prepare(
+    "SELECT u.id, u.display_name AS displayName, u.email_normalized AS phoneNumber, " +
+    "m.role, m.voice_part AS voicePart, m.created_at AS joinedAt " +
+    "FROM choir_memberships m JOIN users u ON u.id = m.user_id " +
+    "WHERE m.choir_id = ? AND m.status = 'active' AND u.status = 'active' " +
+    "ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'conductor' THEN 1 ELSE 2 END, u.display_name COLLATE NOCASE"
+  ).bind(current.choirId).all();
+
+  const members = result.results ?? [];
+  await recordAudit(
+    env, current.choirId, current.userId, "conductor.member_contacts.viewed",
+    "choir", current.choirId, { memberCount: members.length }
+  );
+  return json({ members, actorRole: current.role });
+}
 async function listMembers(request: Request, env: Env): Promise<Response> {
   const current = await requireSession(request, env);
   if (current instanceof Response) return current;
@@ -945,6 +989,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === "POST" && path === "/api/account/phone") return updateAccountPhone(request, env);
   if (request.method === "GET" && path === "/api/songs") return listSongs(request, env);
   if (request.method === "GET" && path === "/api/conductor/members") return listMembers(request, env);
+  if (request.method === "POST" && path === "/api/conductor/contacts") return listMemberContacts(request, env);
   if (request.method === "GET" && path === "/api/conductor/invitations") return listInvitations(request, env);
   if (request.method === "POST" && path === "/api/conductor/invitations") return createInvitation(request, env);
   const revokeMatch = path.match(/^\/api\/conductor\/invitations\/([a-f0-9-]{36})\/revoke$/);
@@ -979,12 +1024,26 @@ export default {
         );
       }
     }
-    const assetResponse = await env.ASSETS.fetch(request);
+    const invitationRoute = url.pathname === "/invitation" || url.pathname === "/invitation/";
+    if (invitationRoute && request.method !== "GET" && request.method !== "HEAD") {
+      return new Response("Method Not Allowed", {
+        status: 405,
+        headers: { "Allow": "GET, HEAD", "Cache-Control": "no-store" }
+      });
+    }
+    const assetRequest = invitationRoute
+      ? new Request(new URL("/invitation.html", url.origin).toString(), {
+          method: request.method,
+          headers: request.headers
+        })
+      : request;
+    const assetResponse = await env.ASSETS.fetch(assetRequest);
     const headers = new Headers(assetResponse.headers);
     headers.set("X-Content-Type-Options", "nosniff");
     headers.set("Referrer-Policy", "no-referrer");
     headers.set("X-Frame-Options", "DENY");
     headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
+    if (invitationRoute) headers.set("Cache-Control", "no-store, max-age=0");
     headers.set("Content-Security-Policy", "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests");
     return new Response(assetResponse.body, {
       status: assetResponse.status,
