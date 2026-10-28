@@ -36,7 +36,7 @@ function setMessage(selector, message, kind = "") {
   element.classList.toggle("message-success", kind === "success");
 }
 function showPanel(id) {
-  for (const name of ["login-panel", "unlock-panel", "forbidden-panel", "dashboard-panel"]) {
+  for (const name of ["login-panel", "unlock-panel", "forbidden-panel", "legal-panel", "dashboard-panel"]) {
     const element = $("#" + name);
     if (element) element.hidden = name !== id;
   }
@@ -468,6 +468,24 @@ $("#unlock-logout").addEventListener("click", async () => {
   state.user = null;
   showPanel("login-panel");
 });
+$("#legal-panel-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector("button[type=submit]");
+  if (!$("#legal-panel-accept").checked) return;
+  button.disabled = true;
+  setMessage("#legal-panel-message", "Se înregistrează acceptarea…");
+  try {
+    await requestJSON("/api/legal/accept", "POST", { acceptedLegal: true });
+    event.currentTarget.reset();
+    setNotice("Documentele au fost acceptate. Poți continua.", "success");
+    await start();
+  } catch (error) {
+    setMessage("#legal-panel-message", error.message, "error");
+  } finally {
+    button.disabled = false;
+  }
+});
+
 async function start() {
   let status = {};
   let session = {};
@@ -487,6 +505,10 @@ async function start() {
   }
   if (session.authenticated && session.user) {
     state.user = session.user;
+    if (session.legalAcceptanceRequired) {
+      showPanel("legal-panel");
+      return;
+    }
     if (!["owner", "conductor"].includes(session.user.role)) {
       showPanel("forbidden-panel");
       return;
