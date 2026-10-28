@@ -9,6 +9,7 @@ db.execute("PRAGMA foreign_keys = ON")
 db.executescript((root / "migrations" / "0001_initial_schema.sql").read_text())
 db.executescript((root / "migrations" / "0002_member_auth_and_conductors.sql").read_text())
 db.executescript((root / "migrations" / "0003_member_phone_verification.sql").read_text())
+db.executescript((root / "migrations" / "0004_preferences_attendance.sql").read_text())
 
 columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
 for required in {"login_code_hash", "pin_salt", "pin_hash"}:
@@ -17,7 +18,7 @@ for required in {"login_code_hash", "pin_salt", "pin_hash"}:
 tables = {row[0] for row in db.execute(
     "SELECT name FROM sqlite_master WHERE type='table'"
 )}
-for required in {"auth_rate_limits", "access_reset_codes", "sessions", "choir_memberships"}:
+for required in {"auth_rate_limits", "access_reset_codes", "sessions", "choir_memberships", "user_preferences", "attendance_sessions", "attendance_records"}:
     assert required in tables, f"Missing table: {required}"
 
 tabor = db.execute("SELECT name, slug, status FROM choirs WHERE id='choir_tabor'").fetchone()
@@ -99,6 +100,46 @@ verification = db.execute(
     "SELECT phone_verified_at, phone_verified_by_user_id FROM choir_memberships WHERE user_id='new-conductor'"
 ).fetchone()
 assert verification == (now, "owner-user"), f"Phone verification persistence failed: {verification}"
+
+# A saved theme and attendance session/record must persist under the new schema.
+db.execute(
+    "INSERT INTO user_preferences (user_id, accent_theme) VALUES ('owner-user', 'violet')"
+)
+theme = db.execute(
+    "SELECT accent_theme FROM user_preferences WHERE user_id='owner-user'"
+).fetchone()
+assert theme == ("violet",), f"Theme preference persistence failed: {theme}"
+try:
+    db.execute(
+        "INSERT INTO user_preferences (user_id, accent_theme) VALUES ('new-conductor', 'not-a-theme')"
+    )
+except sqlite3.IntegrityError:
+    pass
+else:
+    raise AssertionError("Unknown theme must be rejected by the database constraint")
+
+db.execute(
+    "INSERT INTO attendance_sessions (id, choir_id, session_date, title, created_by_user_id) "
+    "VALUES ('att-session-test', 'choir_tabor', '2026-10-28', 'Repetiție', 'owner-user')"
+)
+db.execute(
+    "INSERT INTO attendance_records (id, session_id, membership_id, status, recorded_by_user_id) "
+    "VALUES ('att-record-test', 'att-session-test', 'owner-membership', 'present', 'owner-user')"
+)
+attendance = db.execute(
+    "SELECT s.session_date, r.status FROM attendance_sessions s "
+    "JOIN attendance_records r ON r.session_id=s.id WHERE r.id='att-record-test'"
+).fetchone()
+assert attendance == ("2026-10-28", "present"), f"Attendance persistence failed: {attendance}"
+try:
+    db.execute(
+        "INSERT INTO attendance_records (id, session_id, membership_id, status) "
+        "VALUES ('bad-status-test', 'att-session-test', 'conductor-membership', 'maybe')"
+    )
+except sqlite3.IntegrityError:
+    pass
+else:
+    raise AssertionError("Unknown attendance status must be rejected by the database constraint")
 
 # Legal acknowledgements are stored as auditable, versioned events without a new schema table.
 legal_metadata = '{"termsVersion":"2026-10-28-v1","privacyVersion":"2026-10-28-v1","acceptedVia":"account_activation"}'
