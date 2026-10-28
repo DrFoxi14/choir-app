@@ -334,3 +334,5 @@ html[data-accent-theme="berry"] { --accent: #D778A5; --navy: #853456; --accent-i
 .attendance-row { background: var(--surface); }
 .theme-option:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, white); }
 .theme-option input[type="radio"] { accent-color: var(--accent); }
+
+.account-page-content[hidden], .attendance-page-content[hidden] { display: none !important; }
