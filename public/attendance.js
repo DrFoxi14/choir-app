@@ -43,6 +43,13 @@ function pageNotice(message, kind = "info") {
   if (kind === "error") element.classList.add("error");
   if (kind === "success") element.classList.add("success");
 }
+async function applySavedAccentTheme() {
+  try {
+    const data = await requestJSON("/api/account/preferences");
+    const allowed = ["ocean", "violet", "emerald", "rose", "amber", "teal", "slate", "berry"];
+    document.documentElement.dataset.accentTheme = allowed.includes(data.accentTheme) ? data.accentTheme : "ocean";
+  } catch { /* Keep the default accent when preferences are unavailable. */ }
+}
 
 function renderAttendanceRoster(members) {
   const container = $("#attendance-roster");
@@ -339,6 +346,7 @@ async function startAttendancePage() {
       pageNotice("Pagina de prezență este disponibilă numai dirijorilor.", "error");
       return;
     }
+    await applySavedAccentTheme();
     $("#attendance-page-loading").hidden = true;
     $("#attendance-content").hidden = false;
     $("#attendance-user-line").textContent = session.user.displayName + " · " +
