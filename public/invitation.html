@@ -55,6 +55,21 @@
       <a class="secondary-button back-link" href="/">Înapoi la aplicație</a>
     </section>
 
+    <section id="legal-panel" class="panel invitation-card" aria-labelledby="legal-panel-title" hidden>
+      <p class="eyebrow">ACTUALIZARE DOCUMENTE</p>
+      <h2 id="legal-panel-title">Termeni și confidențialitate</h2>
+      <p class="muted">Documentele aplicației au fost actualizate. Citește-le și confirmă că le accepți pentru a continua.</p>
+      <form id="legal-panel-form" class="form-stack">
+        <div class="legal-acceptance">
+          <input id="legal-panel-accept" name="acceptedLegal" type="checkbox" required>
+          <label for="legal-panel-accept">Am citit și accept Termenii de utilizare și confirm că am luat la cunoștință Nota de informare privind datele personale.</label>
+          <p class="legal-document-links"><a href="/termeni" target="_blank" rel="noopener noreferrer">Termenii de utilizare</a> · <a href="/confidentialitate" target="_blank" rel="noopener noreferrer">Nota de informare privind datele personale</a></p>
+        </div>
+        <button class="primary-button" type="submit">Acceptă și continuă</button>
+        <p id="legal-panel-message" class="form-message" role="status"></p>
+      </form>
+    </section>
+
     <section id="dashboard-panel" hidden>
       <section class="panel invitation-card" aria-labelledby="invite-title">
         <p class="eyebrow">ZONA DIRIJORILOR</p>
