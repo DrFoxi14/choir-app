@@ -212,3 +212,11 @@ footer p { margin-bottom: 5px; }
 .legal-controller-note h2 { margin: 0 0 10px; font-size: 1.15rem; }
 .legal-controller-note p:last-child { margin-bottom: 0; }
 .legal-footer-links { margin-top: 26px; }
+
+.legal-document-links {
+  grid-column: 2;
+  min-width: 0;
+  margin: -4px 0 2px;
+  font-size: .86rem;
+  line-height: 1.5;
+}
