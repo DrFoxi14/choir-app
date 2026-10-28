@@ -71,48 +71,213 @@ function renderContacts() {
   $("#contacts-message").textContent = members.length
     ? "Afișați " + members.length + " din " + state.members.length + " conturi active."
     : "Nu există persoane care să corespundă căutării.";
+
   for (const member of members) {
+    const phone = String(member.phoneNumber || "").trim();
+    const verified = Boolean(Number(member.phoneVerified));
     const card = document.createElement("article");
     card.className = "contact-card";
     const main = document.createElement("div");
-    addText(main, "h3", "contact-name", member.displayName);
+    const titleLine = document.createElement("div");
+    titleLine.className = "contact-title-line";
+    addText(titleLine, "h3", "contact-name", member.displayName);
+    if (phone && verified) {
+      const badge = document.createElement("span");
+      badge.className = "verified-badge";
+      badge.title = "Numărul a fost confirmat manual de un dirijor";
+      const check = document.createElement("span");
+      check.className = "verified-check";
+      check.setAttribute("aria-hidden", "true");
+      check.textContent = "✓";
+      badge.append(check, document.createTextNode("Număr verificat"));
+      titleLine.append(badge);
+    } else if (phone) {
+      addText(titleLine, "span", "unverified-badge", "Neverificat");
+    }
+    main.append(titleLine);
+
     const detailParts = [roleNames[member.role] || member.role];
     if (member.voicePart) detailParts.push(voiceNames[member.voicePart] || member.voicePart);
     addText(main, "p", "muted compact contact-meta", detailParts.join(" · "));
-    addText(main, "p", "contact-phone", member.phoneNumber || "Număr de telefon nesetat");
+    addText(main, "p", "contact-phone", phone || "Număr de telefon nesetat");
+    if (verified && member.phoneVerifiedBy) {
+      const when = member.phoneVerifiedAt ? " · " + formatDate(member.phoneVerifiedAt) : "";
+      addText(main, "p", "muted compact contact-meta", "Verificat de " + member.phoneVerifiedBy + when);
+    }
     card.append(main);
-    const phone = String(member.phoneNumber || "").trim();
+
     if (phone) {
       const actions = document.createElement("div");
       actions.className = "contact-actions";
-      const waNumber = phoneForWhatsApp(phone);
-      if (waNumber) {
-        const whatsApp = document.createElement("a");
-        whatsApp.className = "primary-button";
-        whatsApp.href = "https://wa.me/" + waNumber + "?text=" + encodeURIComponent(
-          "Salut! Cred că numărul tău de telefon din aplicația corului ar putea fi greșit. Îl poți verifica, te rog?"
-        );
-        whatsApp.target = "_blank";
-        whatsApp.rel = "noopener noreferrer";
-        whatsApp.textContent = "Scrie pe WhatsApp";
-        actions.append(whatsApp);
-      }
-      const copy = document.createElement("button");
-      copy.className = "secondary-button";
-      copy.type = "button";
-      copy.textContent = "Copiază numărul";
-      copy.addEventListener("click", async () => {
-        try {
-          await navigator.clipboard.writeText(phone);
-          copy.textContent = "Copiat";
-        } catch {
-          setNotice("Nu am putut copia automat numărul. Selectează-l manual.", "error");
+
+      const verifyButton = document.createElement("button");
+      verifyButton.type = "button";
+      verifyButton.className = verified ? "secondary-button" : "primary-button";
+      verifyButton.textContent = verified ? "Elimină bifa" : "Confirmă numărul";
+      verifyButton.addEventListener("click", () => openPhoneVerificationForm(member, actions, verifyButton));
+      actions.append(verifyButton);
+
+      if (verified) {
+        const waNumber = phoneForWhatsApp(phone);
+        if (waNumber) {
+          const whatsApp = document.createElement("a");
+          whatsApp.className = "primary-button";
+          whatsApp.href = "https://wa.me/" + waNumber + "?text=" + encodeURIComponent(
+            "Salut! Îți scriu în legătură cu Corul Tabor."
+          );
+          whatsApp.target = "_blank";
+          whatsApp.rel = "noopener noreferrer";
+          whatsApp.textContent = "Scrie pe WhatsApp";
+          actions.append(whatsApp);
         }
-      });
-      actions.append(copy);
+        const copy = document.createElement("button");
+        copy.className = "secondary-button";
+        copy.type = "button";
+        copy.textContent = "Copiază numărul";
+        copy.addEventListener("click", async () => {
+          try {
+            await navigator.clipboard.writeText(phone);
+            copy.textContent = "Copiat";
+          } catch {
+            setNotice("Nu am putut copia automat numărul. Selectează-l manual.", "error");
+          }
+        });
+        actions.append(copy);
+      } else {
+        addText(actions, "p", "contact-warning",
+          "WhatsApp este dezactivat până când dirijorul confirmă numărul printr-un canal separat.");
+      }
+
+      if (state.user && (state.user.role === "owner" || member.role === "member")) {
+        const resetButton = document.createElement("button");
+        resetButton.className = "secondary-button";
+        resetButton.type = "button";
+        resetButton.textContent = "Cod resetare PIN";
+        resetButton.addEventListener("click", () => runMemberAction(member, "reset"));
+
+        const renewButton = document.createElement("button");
+        renewButton.className = "secondary-button";
+        renewButton.type = "button";
+        renewButton.textContent = "Cod cont nou";
+        renewButton.addEventListener("click", () => runMemberAction(member, "renew-login-code"));
+
+        const changePhoneButton = document.createElement("button");
+        changePhoneButton.className = "secondary-button";
+        changePhoneButton.type = "button";
+        changePhoneButton.textContent = "Schimbă numărul";
+        changePhoneButton.addEventListener("click", () => runPhoneChangeAction(member));
+
+        actions.append(resetButton, renewButton, changePhoneButton);
+      }
+      card.append(actions);
+    } else if (state.user && (state.user.role === "owner" || member.role === "member")) {
+      const actions = document.createElement("div");
+      actions.className = "contact-actions";
+      const changePhoneButton = document.createElement("button");
+      changePhoneButton.className = "secondary-button";
+      changePhoneButton.type = "button";
+      changePhoneButton.textContent = "Setează numărul";
+      changePhoneButton.addEventListener("click", () => runPhoneChangeAction(member));
+      actions.append(changePhoneButton);
       card.append(actions);
     }
     list.append(card);
+  }
+}
+
+function openPhoneVerificationForm(member, actions, trigger) {
+  const existing = actions.querySelector(".verification-form");
+  if (existing) return;
+  trigger.hidden = true;
+
+  const form = document.createElement("form");
+  form.className = "verification-form form-stack";
+  const label = document.createElement("label");
+  label.textContent = "Confirmă cu PIN-ul tău din 6 cifre";
+  const pinInput = document.createElement("input");
+  pinInput.type = "password";
+  pinInput.inputMode = "numeric";
+  pinInput.pattern = "[0-9]{6}";
+  pinInput.minLength = 6;
+  pinInput.maxLength = 6;
+  pinInput.autocomplete = "current-password";
+  pinInput.required = true;
+  label.htmlFor = "verification-pin-" + member.id;
+  pinInput.id = label.htmlFor;
+  const note = addText(form, "p", "muted compact",
+    Boolean(Number(member.phoneVerified))
+      ? "Bifa va fi eliminată. WhatsApp va fi ascuns până la o nouă verificare."
+      : "Confirmă doar după ce ai verificat direct cu persoana că numărul îi aparține. Aceasta este o confirmare manuală a dirijorului.");
+  const message = addText(form, "p", "form-message", "");
+  message.setAttribute("role", "status");
+  const actionsRow = document.createElement("div");
+  actionsRow.className = "contact-actions";
+  const submit = document.createElement("button");
+  submit.className = "primary-button";
+  submit.type = "submit";
+  submit.textContent = Boolean(Number(member.phoneVerified)) ? "Elimină bifa" : "Confirmă numărul";
+  const cancel = document.createElement("button");
+  cancel.className = "secondary-button";
+  cancel.type = "button";
+  cancel.textContent = "Anulează";
+  cancel.addEventListener("click", () => {
+    form.remove();
+    trigger.hidden = false;
+  });
+  actionsRow.append(submit, cancel);
+  form.append(label, pinInput, note, actionsRow, message);
+  actions.append(form);
+  pinInput.focus();
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    submit.disabled = true;
+    setMessage("#contacts-message", "Se salvează starea verificării…");
+    try {
+      const nextVerified = !Boolean(Number(member.phoneVerified));
+      const data = await requestJSON(
+        "/api/conductor/members/" + encodeURIComponent(member.id) + "/phone-verification",
+        "POST",
+        { verified: nextVerified, pin: pinInput.value }
+      );
+      const target = state.members.find((item) => item.id === member.id);
+      if (target) Object.assign(target, data);
+      renderContacts();
+      setNotice(data.message, "success");
+    } catch (error) {
+      setMessage(".verification-form .form-message", error.message, "error");
+    } finally {
+      submit.disabled = false;
+      pinInput.value = "";
+    }
+  });
+}
+
+async function runMemberAction(member, action) {
+  const explanation = action === "reset"
+    ? "Cod de resetare PIN pentru " + member.displayName
+    : "Noul cod de conectare pentru " + member.displayName;
+  try {
+    const response = await requestJSON(
+      "/api/conductor/members/" + encodeURIComponent(member.id) + "/" + action,
+      "POST", {}
+    );
+    showIssuedCode(response.code, response.message || explanation, explanation);
+  } catch (error) {
+    setNotice(error.message, "error");
+  }
+}
+async function runPhoneChangeAction(member) {
+  const phone = window.prompt("Introdu numărul de telefon nou pentru " + member.displayName + " (de ex. 0754 322 323):");
+  if (phone === null || !phone.trim()) return;
+  try {
+    const response = await requestJSON(
+      "/api/conductor/members/" + encodeURIComponent(member.id) + "/phone-change-code",
+      "POST", { phone }
+    );
+    showIssuedCode(response.code, response.message, "Cod schimbare telefon · " + member.displayName);
+  } catch (error) {
+    setNotice(error.message, "error");
   }
 }
 async function unlockContacts(pin) {
