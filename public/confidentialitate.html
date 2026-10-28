@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172554">
+  <meta name="description" content="Notă de informare privind datele personale prelucrate de Choir App pentru Corul Tabor.">
+  <title>Confidențialitate · Choir App</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <main class="invitation-shell">
+    <header class="invitation-topbar">
+      <div class="brand-mark" aria-hidden="true">♪</div>
+      <div class="brand-copy">
+        <p class="eyebrow">CORUL TABOR</p>
+        <h1>Confidențialitate</h1>
+      </div>
+      <a class="secondary-button back-link" href="/">Înapoi la aplicație</a>
+    </header>
+    <article class="panel invitation-card legal-document">
+      <p class="muted compact">Nota de informare · versiunea 2026-10-28-v1 · actualizată la 28 octombrie 2026</p>
+      <p>Vrem să fie clar ce date folosește Choir App, de ce le folosește și cine le poate vedea. Aplicația este destinată organizării interne a Corului Tabor. Nu conține publicitate, nu vinde date și nu folosește profilare comercială.</p>
+
+      <div class="legal-controller-note">
+        <h2>Operatorul datelor și contactul</h2>
+        <p><strong>Operator:</strong> entitatea juridică sau persoana care organizează Corul Tabor și stabilește scopurile și mijloacele folosirii aplicației.</p>
+        <p><strong>De completat înainte de lansarea oficială:</strong> denumirea juridică completă a operatorului, adresa de corespondență și un contact direct (de exemplu, o adresă de e-mail) pentru cereri privind datele personale. Numele corului, singur, nu identifică în mod sigur operatorul juridic.</p>
+        <p>Până la publicarea unui contact direct, poți cere dirijorului principal să transmită solicitarea administratorului desemnat al aplicației. Operatorul trebuie să confirme datele de identificare înainte de folosirea aplicației cu membri reali.</p>
+      </div>
+
+      <h2>1. Ce date prelucrăm</h2>
+      <ul>
+        <li><strong>Cont:</strong> numele afișat, numărul de telefon, rolul în cor și vocea atribuită (Sopran, Alto, Tenor sau Bas).</li>
+        <li><strong>Securitate:</strong> PIN-ul nu este salvat în clar; este păstrat un hash cu salt. Codurile de conectare, tokenurile de sesiune și codurile de resetare sunt păstrate sub formă de hash. Sesiunile expiră după 14 zile.</li>
+        <li><strong>Invitații:</strong> coduri de invitație de unică folosință, rolul și vocea propuse, termenul de expirare și o valoare criptografic derivată din numărul destinației, folosită pentru a verifica faptul că invitația este activată cu numărul potrivit. Numărul nu este păstrat în clar în înregistrarea invitației; după activare, numărul contului este păstrat în profil.</li>
+        <li><strong>Jurnale de securitate:</strong> data și tipul unor acțiuni de administrare, autentificare, confirmare manuală a numărului și acceptare a documentelor. Pentru limitarea încercărilor se folosesc identificatori derivați criptografic, nu IP-ul sau PIN-ul brut în cheia de limitare.</li>
+        <li><strong>Date tehnice:</strong> furnizorul de găzduire poate prelucra date tehnice ale solicitărilor necesare pentru livrarea și securizarea serviciului, conform propriei documentații.</li>
+      </ul>
+
+      <h2>2. De ce și în ce temei</h2>
+      <p>Datele sunt folosite pentru crearea și securizarea contului, verificarea invitației, gestionarea rolului și a vocii, coordonarea corului, resetarea accesului și investigarea incidentelor. Operatorul trebuie să confirme temeiurile aplicabile situației concrete. În funcție de relația cu utilizatorul, funcțiile solicitate pot fi necesare pentru furnizarea serviciului (art. 6 alin. (1) lit. b din GDPR), iar jurnalizarea de securitate și prevenirea abuzului pot fi bazate pe interes legitim (art. 6 alin. (1) lit. f), numai dacă operatorul documentează că acest interes nu este depășit de drepturile persoanei.</p>
+      <p>Acceptarea acestor termeni nu este o autorizare generală de marketing și nu înseamnă consimțământ pentru scopuri fără legătură cu aplicația. Nu folosim datele pentru reclame sau vânzare către parteneri.</p>
+
+      <h2>3. Cine poate vedea numărul</h2>
+      <p>Numărul nu este public și nu este afișat membrilor obișnuiți. Lista privată este accesibilă dirijorilor autorizați ai corului, după reintroducerea PIN-ului. Accesul este limitat la coordonarea activității corului. Un număr introdus într-un grup WhatsApp nu devine, doar din acest motiv, public și nici nu înseamnă automat că poate fi reutilizat pentru alte scopuri.</p>
+      <p>Marcajul albastru este o confirmare manuală a unui dirijor după verificarea numărului printr-un canal separat. Nu este o verificare automată prin SMS și nu este o confirmare emisă de WhatsApp. Linkul WhatsApp se afișează doar după marcarea manuală a numărului ca verificat.</p>
+
+      <h2>4. Cui îi pot fi comunicate date</h2>
+      <ul>
+        <li>Dirijorilor autorizați, numai în limitele funcțiilor descrise mai sus.</li>
+        <li>Cloudflare, ca furnizor tehnic pentru găzduirea aplicației și baza de date, în măsura necesară operării și securizării serviciului. Consultă și <a href="https://www.cloudflare.com/privacypolicy/" target="_blank" rel="noopener noreferrer">Politica de confidențialitate Cloudflare</a>; infrastructura globală a furnizorului poate presupune prelucrare în mai multe jurisdicții, în condițiile documentației și garanțiilor sale.</li>
+        <li>WhatsApp/Meta numai dacă alegi să deschizi linkul extern WhatsApp. Din acel moment, platforma externă își aplică propriile reguli și politici.</li>
+        <li>Autorităților sau altor destinatari numai când există o obligație ori un temei legal aplicabil.</li>
+      </ul>
+      <p>Aplicația nu încorporează instrumente publicitare sau analitice terțe și nu transmite intenționat lista de contacte către rețele sociale.</p>
+
+      <h2>5. Unde și cât timp păstrăm datele</h2>
+      <p>Datele contului și ale apartenenței la cor sunt păstrate cât timp contul și participarea rămân active. Când participarea încetează sau este admisă o cerere de ștergere, accesul trebuie dezactivat, iar datele care nu mai sunt necesare trebuie șterse sau anonimizate; pot rămâne numai datele care trebuie păstrate pentru obligații legale sau pentru constatarea, exercitarea ori apărarea unor drepturi.</p>
+      <p>Codurile de invitație expiră după 7 zile și pot fi folosite o singură dată. Codurile de resetare expiră după 30 de minute. Înregistrările tehnice și jurnalele de securitate sunt păstrate numai cât timp sunt necesare pentru securitate, investigarea incidentelor și apărarea drepturilor, cu revizuire periodică de către operator. Operatorul trebuie să aplice și să documenteze perioade de retenție corespunzătoare pentru jurnale și conturile inactive.</p>
+
+      <h2>6. Securitate</h2>
+      <p>Aplicația separă accesul membrilor de funcțiile dirijorilor, limitează încercările repetate, folosește sesiuni cu expirare și nu stochează PIN-ul în clar. Aceste măsuri reduc riscul, dar nu pot garanta eliminarea tuturor incidentelor. Anunță operatorul dacă observi acces neautorizat, un număr incorect sau o utilizare necorespunzătoare.</p>
+
+      <h2>7. Drepturile tale</h2>
+      <p>În condițiile GDPR, poți solicita acces la date, rectificare, ștergere, restricționarea prelucrării, portabilitate sau te poți opune prelucrării bazate pe interes legitim. Unele drepturi au condiții și excepții legale. Poți depune și o plângere la <a href="https://www.dataprotection.ro/" target="_blank" rel="noopener noreferrer">Autoritatea Națională de Supraveghere a Prelucrării Datelor cu Caracter Personal (ANSPDCP)</a>. Operatorul trebuie să răspundă în termenele prevăzute de lege, de regulă în cel mult o lună.</p>
+      <p>Pentru a exercita aceste drepturi, contactează operatorul folosind datele de contact care trebuie completate în secțiunea de mai sus. Nu este necesar să postezi public numărul tău ori alte date personale pentru a face o solicitare.</p>
+
+      <h2>8. Cookie-uri</h2>
+      <p>Aplicația folosește numai un cookie tehnic de sesiune necesar autentificării, cu atribute de securitate. Nu sunt folosite cookie-uri de publicitate sau pentru urmărire comercială.</p>
+
+      <h2>9. Actualizări</h2>
+      <p>Dacă scopurile, datele, destinatarii sau drepturile descrise aici se schimbă în mod material, nota va fi actualizată, iar utilizatorilor li se va cere să consulte noua versiune înainte să continue utilizarea funcțiilor protejate.</p>
+      <p class="legal-footer-links"><a href="/termeni">Termeni de utilizare</a> · <a href="/">Înapoi la aplicație</a></p>
+    </article>
+    <footer>
+      <p>Corul Tabor · Choir App</p>
+      <p>Fără reclame, vânzare de date sau urmărire comercială în aplicație.</p>
+    </footer>
+  </main>
+</body>
+</html>
