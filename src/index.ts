@@ -766,7 +766,15 @@ export default {
     if (url.pathname.startsWith("/api/")) {
       try {
         return await handleApi(request, env);
-      } catch {
+      } catch (error) {
+        // Never log request bodies, setup keys, PINs, account codes, or cookies.
+        // Safe metadata here makes production D1/runtime failures diagnosable.
+        console.error("Worker API request failed", {
+          method: request.method,
+          path: url.pathname,
+          errorName: error instanceof Error ? error.name : "UnknownError",
+          errorMessage: error instanceof Error ? error.message : String(error)
+        });
         return fail(
           "service_unavailable",
           "Serviciul nu a putut procesa cererea. Verifică migrațiile D1 și configurația serverului.",
