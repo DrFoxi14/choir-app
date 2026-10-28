@@ -8,6 +8,7 @@ db.execute("PRAGMA foreign_keys = ON")
 
 db.executescript((root / "migrations" / "0001_initial_schema.sql").read_text())
 db.executescript((root / "migrations" / "0002_member_auth_and_conductors.sql").read_text())
+db.executescript((root / "migrations" / "0003_member_phone_verification.sql").read_text())
 
 columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
 for required in {"login_code_hash", "pin_salt", "pin_hash"}:
@@ -84,6 +85,20 @@ membership = db.execute(
     "SELECT role, voice_part FROM choir_memberships WHERE user_id='new-conductor'"
 ).fetchone()
 assert membership == ("conductor", None), f"Wrong conductor role/voice: {membership}"
+
+verification_columns = {row[1] for row in db.execute("PRAGMA table_info(choir_memberships)")}
+for required in {"phone_verified_at", "phone_verified_by_user_id"}:
+    assert required in verification_columns, f"Missing membership verification column: {required}"
+
+db.execute(
+    "UPDATE choir_memberships SET phone_verified_at = ?, phone_verified_by_user_id = ? "
+    "WHERE choir_id = 'choir_tabor' AND user_id = 'new-conductor'",
+    (now, "owner-user"),
+)
+verification = db.execute(
+    "SELECT phone_verified_at, phone_verified_by_user_id FROM choir_memberships WHERE user_id='new-conductor'"
+).fetchone()
+assert verification == (now, "owner-user"), f"Phone verification persistence failed: {verification}"
 
 fk_errors = list(db.execute("PRAGMA foreign_key_check"))
 assert not fk_errors, f"Foreign key violations: {fk_errors}"
