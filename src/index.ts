@@ -1,6 +1,10 @@
 type Role = "member" | "conductor" | "owner";
 type VoicePart = "S" | "A" | "T" | "B";
 
+// Bump these version strings whenever the actual documents are materially updated.
+const TERMS_VERSION = "2026-10-28-v1";
+const PRIVACY_VERSION = "2026-10-28-v1";
+
 interface D1Result<T = Record<string, unknown>> {
   results?: T[];
   success: boolean;
@@ -265,6 +269,25 @@ async function recordAudit(
     "VALUES (?, ?, ?, ?, ?, ?, ?)"
   ).bind(crypto.randomUUID(), choirId, actorId, action, targetType, targetId, JSON.stringify(metadata)).run();
 }
+async function hasCurrentLegalAcceptance(env: Env, userId: string, choirId: string): Promise<boolean> {
+  if (!env.DB) return false;
+  const result = await env.DB.prepare(
+    "SELECT id FROM audit_logs WHERE choir_id = ? AND actor_user_id = ? " +
+    "AND action = 'legal.terms.accepted' " +
+    "AND json_extract(metadata_json, '$.termsVersion') = ? " +
+    "AND json_extract(metadata_json, '$.privacyVersion') = ? LIMIT 1"
+  ).bind(choirId, userId, TERMS_VERSION, PRIVACY_VERSION).all<{ id: string }>();
+  return Boolean(result.results?.length);
+}
+async function recordLegalAcceptance(
+  env: Env, choirId: string, userId: string, acceptedVia: string
+): Promise<void> {
+  await recordAudit(env, choirId, userId, "legal.terms.accepted", "user", userId, {
+    termsVersion: TERMS_VERSION,
+    privacyVersion: PRIVACY_VERSION,
+    acceptedVia
+  });
+}
 function authUnavailable(env: Env): Response | null {
   return authConfigured(env) ? null : fail(
     "authentication_not_configured",
@@ -308,6 +331,9 @@ async function bootstrapOwner(request: Request, env: Env): Promise<Response> {
   const setupKey = typeof body.setupKey === "string" ? body.setupKey : "";
   const displayName = cleanDisplayName(body.displayName);
   const pin = body.pin;
+  if (body.acceptedLegal !== true) {
+    return fail("legal_acceptance_required", "Pentru a crea contul, acceptă Termenii de utilizare și confirmă că ai citit Nota de informare privind datele personale.", 428);
+  }
   if (!constantTimeEqual(setupKey, env.BOOTSTRAP_SETUP_KEY || "")) {
     return fail("invalid_setup_key", "Cheia de configurare nu este corectă.", 401);
   }
@@ -347,7 +373,13 @@ async function bootstrapOwner(request: Request, env: Env): Promise<Response> {
       "INSERT INTO audit_logs (id, choir_id, actor_user_id, action, target_type, target_id, metadata_json) " +
       "SELECT ?, ?, ?, 'owner.bootstrap', 'user', ?, ? " +
       "WHERE EXISTS (SELECT 1 FROM choir_memberships WHERE id = ? AND user_id = ? AND role = 'owner' AND status = 'active')"
-    ).bind(crypto.randomUUID(), choir.id, userId, userId, JSON.stringify({ role: "owner" }), membershipId, userId)
+    ).bind(crypto.randomUUID(), choir.id, userId, userId, JSON.stringify({ role: "owner" }), membershipId, userId),
+    env.DB.prepare(
+      "INSERT INTO audit_logs (id, choir_id, actor_user_id, action, target_type, target_id, metadata_json) " +
+      "SELECT ?, ?, ?, 'legal.terms.accepted', 'user', ?, ? " +
+      "WHERE EXISTS (SELECT 1 FROM choir_memberships WHERE id = ? AND user_id = ? AND role = 'owner' AND status = 'active')"
+    ).bind(crypto.randomUUID(), choir.id, userId, userId,
+      JSON.stringify({ termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION, acceptedVia: "owner_bootstrap" }), membershipId, userId)
   ];
   const results = await env.DB.batch(statements);
   if (Number(results[1]?.meta?.changes || 0) !== 1 || Number(results[2]?.meta?.changes || 0) !== 1) {
@@ -372,6 +404,9 @@ async function activateAccount(request: Request, env: Env): Promise<Response> {
   const displayName = cleanDisplayName(body.displayName);
   const phoneNumber = normalizePhone(body.phone);
   const pin = body.pin;
+  if (body.acceptedLegal !== true) {
+    return fail("legal_acceptance_required", "Pentru a activa contul, acceptă Termenii de utilizare și confirmă că ai citit Nota de informare privind datele personale.", 428);
+  }
   if (code.length < 12 || !displayName || !phoneNumber || !validPin(pin)) {
     return fail("invalid_fields", "Completează codul de invitație, numele, un număr de mobil românesc și un PIN din 6 cifre.", 400);
   }
@@ -442,12 +477,19 @@ async function activateAccount(request: Request, env: Env): Promise<Response> {
       "SELECT ?, ?, ?, 'account.activated', 'user', ?, ? WHERE EXISTS " +
       "(SELECT 1 FROM choir_memberships WHERE id = ? AND user_id = ? AND status = 'active')"
     ).bind(crypto.randomUUID(), choir.id, userId, userId,
-      JSON.stringify({ role: candidate.intended_role, voicePart: candidate.voice_part }), membershipId, userId)
+      JSON.stringify({ role: candidate.intended_role, voicePart: candidate.voice_part }), membershipId, userId),
+    env.DB.prepare(
+      "INSERT INTO audit_logs (id, choir_id, actor_user_id, action, target_type, target_id, metadata_json) " +
+      "SELECT ?, ?, ?, 'legal.terms.accepted', 'user', ?, ? " +
+      "WHERE EXISTS (SELECT 1 FROM choir_memberships WHERE id = ? AND user_id = ? AND status = 'active')"
+    ).bind(crypto.randomUUID(), choir.id, userId, userId,
+      JSON.stringify({ termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION, acceptedVia: "account_activation" }), membershipId, userId)
   ];
   const results = await env.DB.batch(statements);
   if (Number(results[0]?.meta?.changes || 0) !== 1 || Number(results[1]?.meta?.changes || 0) !== 1 ||
-      Number(results[2]?.meta?.changes || 0) !== 1 || Number(results[3]?.meta?.changes || 0) !== 1) {
-    return fail("invalid_activation_code", "Codul nu este valid, a expirat sau a fost deja folosit.", 409);
+      Number(results[2]?.meta?.changes || 0) !== 1 || Number(results[3]?.meta?.changes || 0) !== 1 ||
+      Number(results[5]?.meta?.changes || 0) !== 1) {
+    return fail("invalid_activation_code", "Codul nu este valid, a expirat sau a fost deja folosit. Cere ajutorul dirijorului dacă eroarea persistă.", 409);
   }
   return json({
     authenticated: true,
@@ -496,6 +538,11 @@ async function login(request: Request, env: Env): Promise<Response> {
   if (!user || !isRole(user.role) || !user.pin_hash || !constantTimeEqual(calculatedHash, user.pin_hash)) {
     return fail("invalid_credentials", "Codul contului sau PIN-ul nu este corect.", 401);
   }
+  const currentLegalAcceptance = await hasCurrentLegalAcceptance(env, user.id, choir.id);
+  if (!currentLegalAcceptance && body.acceptedLegal !== true) {
+    return fail("legal_acceptance_required", "Documentele de utilizare au fost actualizate. Citește Termenii și Nota de informare, apoi bifează acceptarea pentru a continua.", 428);
+  }
+  if (!currentLegalAcceptance) await recordLegalAcceptance(env, choir.id, user.id, "login");
   const sessionId = crypto.randomUUID();
   const session = await createSession(env, user.id, sessionId);
   await recordAudit(env, choir.id, user.id, "session.created", "session", sessionId);
@@ -503,6 +550,20 @@ async function login(request: Request, env: Env): Promise<Response> {
     authenticated: true,
     user: { displayName: user.display_name, role: user.role, voicePart: user.voice_part, phoneNumber: user.phone_number, choirName: user.choir_name }
   }, 200, { "Set-Cookie": sessionCookie(request, session.token, SESSION_DAYS * 86400) });
+}
+async function acceptLegalTerms(request: Request, env: Env): Promise<Response> {
+  const body = await readJson(request);
+  if (!body || body.acceptedLegal !== true) {
+    return fail("legal_acceptance_required", "Bifează acceptarea termenilor și confirmă că ai citit nota de informare.", 400);
+  }
+  // Bypass requireSession intentionally: legacy sessions need this endpoint to accept
+  // the current legal version before protected endpoints become available again.
+  const current = await getCurrentSession(request, env);
+  if (!current) return fail("authentication_required", "Conectează-te pentru a continua.", 401);
+  if (!(await hasCurrentLegalAcceptance(env, current.userId, current.choirId))) {
+    await recordLegalAcceptance(env, current.choirId, current.userId, "existing_session");
+  }
+  return json({ ok: true, termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION });
 }
 async function resetAccess(request: Request, env: Env): Promise<Response> {
   const unavailable = authUnavailable(env);
@@ -726,6 +787,9 @@ async function requireSession(request: Request, env: Env): Promise<SessionRow | 
   if (unavailable) return unavailable;
   const session = await getCurrentSession(request, env);
   if (!session) return fail("authentication_required", "Conectează-te pentru a continua.", 401);
+  if (!(await hasCurrentLegalAcceptance(env, session.userId, session.choirId))) {
+    return fail("legal_acceptance_required", "Citește Termenii de utilizare și Nota de informare privind datele personale, apoi acceptă pentru a continua.", 428);
+  }
   return session;
 }
 function isConductor(session: SessionRow): boolean {
@@ -1037,6 +1101,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     const current = await getCurrentSession(request, env);
     return json(current ? {
       authenticated: true,
+      legalAcceptanceRequired: !(await hasCurrentLegalAcceptance(env, current.userId, current.choirId)),
       user: {
         id: current.userId, displayName: current.displayName, role: current.role,
         voicePart: current.voicePart, phoneNumber: current.phoneNumber, choirName: current.choirName
@@ -1049,6 +1114,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === "POST" && !sameOrigin(request)) {
     return fail("origin_not_allowed", "Cerere refuzată.", 403);
   }
+  if (request.method === "POST" && path === "/api/legal/accept") return acceptLegalTerms(request, env);
   if (request.method === "POST" && path === "/api/setup/bootstrap") return bootstrapOwner(request, env);
   if (request.method === "POST" && path === "/api/auth/activate") return activateAccount(request, env);
   if (request.method === "POST" && path === "/api/auth/login") return login(request, env);
@@ -1094,15 +1160,21 @@ export default {
         );
       }
     }
-    const invitationRoute = url.pathname === "/invitation" || url.pathname === "/invitation/";
-    if (invitationRoute && request.method !== "GET" && request.method !== "HEAD") {
+    const staticPages: Record<string, string> = {
+      "/invitation": "invitation.html",
+      "/invitation/": "invitation.html",
+      "/termeni": "termeni.html",
+      "/confidentialitate": "confidentialitate.html"
+    };
+    const mappedPage = staticPages[url.pathname];
+    if (mappedPage && request.method !== "GET" && request.method !== "HEAD") {
       return new Response("Method Not Allowed", {
         status: 405,
         headers: { "Allow": "GET, HEAD", "Cache-Control": "no-store" }
       });
     }
-    const assetRequest = invitationRoute
-      ? new Request(new URL("/invitation.html", url.origin).toString(), {
+    const assetRequest = mappedPage
+      ? new Request(new URL("/" + mappedPage, url.origin).toString(), {
           method: request.method,
           headers: request.headers
         })
@@ -1113,7 +1185,7 @@ export default {
     headers.set("Referrer-Policy", "no-referrer");
     headers.set("X-Frame-Options", "DENY");
     headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-    if (invitationRoute) headers.set("Cache-Control", "no-store, max-age=0");
+    if (mappedPage) headers.set("Cache-Control", "no-store, max-age=0");
     headers.set("Content-Security-Policy", "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; upgrade-insecure-requests");
     return new Response(assetResponse.body, {
       status: assetResponse.status,
