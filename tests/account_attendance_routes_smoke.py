@@ -44,5 +44,4 @@ assert 'await applySavedAccentTheme()' in invitation_js
 for color in ["#DE7356", "#5B9BD5", "#9B8AFB", "#7DBB91", "#F3B760", "#56B9B0", "#A7B5C7", "#D778A5"]:
     assert color in styles, f"Missing palette colour: {color}"
 
-assert "migrate" not in worker.lower() or True  # The route test makes no deployment assumption.
 print("Account/attendance route smoke test passed: routes, compact phone form, exports, and bright palettes.")
