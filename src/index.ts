@@ -382,7 +382,8 @@ async function bootstrapOwner(request: Request, env: Env): Promise<Response> {
       JSON.stringify({ termsVersion: TERMS_VERSION, privacyVersion: PRIVACY_VERSION, acceptedVia: "owner_bootstrap" }), membershipId, userId)
   ];
   const results = await env.DB.batch(statements);
-  if (Number(results[1]?.meta?.changes || 0) !== 1 || Number(results[2]?.meta?.changes || 0) !== 1) {
+  if (Number(results[1]?.meta?.changes || 0) !== 1 || Number(results[2]?.meta?.changes || 0) !== 1 ||
+      Number(results[4]?.meta?.changes || 0) !== 1) {
     return fail("setup_already_completed", "Contul principal a fost deja configurat sau configurarea nu a putut fi finalizată.", 409);
   }
   return json({
