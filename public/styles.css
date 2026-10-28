@@ -112,3 +112,33 @@ footer p { margin-bottom: 5px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; }
 }
+
+
+/* Dedicated /invitation page */
+.invitation-route-link { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; cursor: pointer; }
+.invitation-shell { width: min(100% - 28px, 860px); margin: 0 auto; padding: 22px 0 36px; min-height: 100svh; display: flex; flex-direction: column; gap: 18px; }
+.invitation-topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.invitation-topbar .brand-mark { flex: 0 0 48px; }
+.invitation-topbar .back-link { margin-left: auto; }
+.invitation-card { padding: clamp(18px, 4vw, 28px); }
+.invitation-card h2, .invitation-card h3 { margin-bottom: 10px; }
+.invitation-controls { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.invitation-controls input { flex: 1 1 220px; min-width: 0; }
+.invitation-notice { padding: 12px 14px; border-radius: 12px; background: #eef2ff; color: #26376f; line-height: 1.45; }
+.invitation-notice.error { background: #fff0ee; color: #9f261c; }
+.invitation-notice.success { background: #e9f8ef; color: #17663b; }
+.contact-list, .invitation-list { display: grid; gap: 10px; }
+.contact-card { display: grid; gap: 12px; background: #fff; border: 1px solid var(--line); border-radius: 15px; padding: 15px; }
+.contact-name { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+.contact-meta { margin: 4px 0 0; }
+.contact-phone { font-weight: 700; overflow-wrap: anywhere; }
+.contact-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.contact-actions a { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+.contact-actions button, .contact-actions a { min-height: 42px; }
+.contact-actions .secondary-button { cursor: pointer; }
+.invitation-empty { color: var(--muted); padding: 14px 0; }
+.invitation-count { font-size: .87rem; color: var(--muted); }
+.invitation-shell [hidden] { display: none !important; }
+@media (min-width: 640px) {
+  .contact-card { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+}
