@@ -8,6 +8,8 @@ Source repository for Choir App — temporarily public during initial developmen
 - Separate member and conductor roles.
 - One main owner account plus individually invited conductor accounts. The owner can invite other conductors; conductors can invite members.
 - A dedicated `/invitation` page for conductor invitations, member contacts, invitation revocation, PIN reset codes, and account-code renewal.
+- A dedicated `/account` page for saved personal color palettes and account settings; changing a phone number is hidden behind the **Schimbă numărul** button until requested.
+- A dedicated `/prezenta` page for conductor-only attendance recording and date-range Excel/Markdown exports.
 - A conductor-confirmed phone verification badge. WhatsApp actions are hidden until the number is manually verified; changing the phone number clears verification.
 - D1 records scoped to the current choir; the schema supports multiple choirs.
 - Account-level accent palettes stored in D1, with eight curated colors.
