@@ -94,6 +94,12 @@ def main() -> None:
     assert "Cloudflare" in privacy
     assert "ANSPDCP" in privacy
 
+    INVITATION_HTML = (ROOT / "public" / "invitation.html").read_text(encoding="utf-8")
+    INVITATION_JS = (ROOT / "public" / "invitation.js").read_text(encoding="utf-8")
+    assert 'id="legal-panel-form"' in INVITATION_HTML
+    assert 'session.legalAcceptanceRequired' in INVITATION_JS
+    assert 'requestJSON("/api/legal/accept", "POST", { acceptedLegal: true })' in INVITATION_JS
+
 
 
 if __name__ == "__main__":
