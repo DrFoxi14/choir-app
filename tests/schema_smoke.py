@@ -100,6 +100,21 @@ verification = db.execute(
 ).fetchone()
 assert verification == (now, "owner-user"), f"Phone verification persistence failed: {verification}"
 
+# Legal acknowledgements are stored as auditable, versioned events without a new schema table.
+legal_metadata = '{"termsVersion":"2026-10-28-v1","privacyVersion":"2026-10-28-v1","acceptedVia":"account_activation"}'
+db.execute(
+    "INSERT INTO audit_logs (id, choir_id, actor_user_id, action, target_type, target_id, metadata_json) "
+    "VALUES (?, 'choir_tabor', 'new-conductor', 'legal.terms.accepted', 'user', 'new-conductor', ?)",
+    ("legal-acceptance-test", legal_metadata),
+)
+recorded_versions = db.execute(
+    "SELECT json_extract(metadata_json, '$.termsVersion'), json_extract(metadata_json, '$.privacyVersion') "
+    "FROM audit_logs WHERE action='legal.terms.accepted' AND target_id='new-conductor'"
+).fetchone()
+assert recorded_versions == ("2026-10-28-v1", "2026-10-28-v1"), (
+    f"Legal acceptance versions were not recorded correctly: {recorded_versions}"
+)
+
 fk_errors = list(db.execute("PRAGMA foreign_key_check"))
 assert not fk_errors, f"Foreign key violations: {fk_errors}"
 
