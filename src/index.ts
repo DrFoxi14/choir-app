@@ -41,7 +41,7 @@ interface RateRow { attempts: number; window_started_at: number; }
 const encoder = new TextEncoder();
 const SESSION_DAYS = 14;
 const AUTH_WINDOW_SECONDS = 900;
-const PIN_ITERATIONS = 120000;
+const PIN_ITERATIONS = 100000;
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const VOICE_PARTS = ["S", "A", "T", "B"] as const;
 
