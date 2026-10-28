@@ -467,6 +467,7 @@ $("#unlock-logout").addEventListener("click", async () => {
   showPanel("login-panel");
 });
 $("#legal-panel-form").addEventListener("submit", async (event) => {
+  const form = event.currentTarget;
   event.preventDefault();
   const button = event.currentTarget.querySelector("button[type=submit]");
   if (!$("#legal-panel-accept").checked) return;
@@ -474,7 +475,7 @@ $("#legal-panel-form").addEventListener("submit", async (event) => {
   setMessage("#legal-panel-message", "Se înregistrează acceptarea…");
   try {
     await requestJSON("/api/legal/accept", "POST", { acceptedLegal: true });
-    event.currentTarget.reset();
+    form.reset();
     setNotice("Documentele au fost acceptate. Poți continua.", "success");
     await start();
   } catch (error) {
