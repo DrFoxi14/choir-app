@@ -74,15 +74,13 @@
       <section class="panel invitation-card" aria-labelledby="invite-title">
         <p class="eyebrow">ZONA DIRIJORILOR</p>
         <h2 id="invite-title">Invită un membru</h2>
-        <p class="muted">Codurile sunt valabile 7 zile, pot fi folosite o singură dată și sunt asociate numărului introdus.</p>
+        <p class="muted">Codurile sunt valabile 7 zile și pot fi folosite o singură dată. Nu trebuie să introduci numărul membrului; acesta își va completa propriul număr la activare.</p>
         <form id="invitation-form" class="form-stack">
           <label for="invitation-role">Tipul contului</label>
           <select id="invitation-role" name="role">
             <option value="member">Membru al corului</option>
             <option id="conductor-option" value="conductor" hidden>Dirijor</option>
           </select>
-          <label for="invitation-phone">Numărul de telefon al persoanei</label>
-          <input id="invitation-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0754 322 323" required>
           <div id="voice-group">
             <label for="invitation-voice">Vocea membrului</label>
             <select id="invitation-voice" name="voicePart" required>
