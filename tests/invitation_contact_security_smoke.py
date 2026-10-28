@@ -51,7 +51,7 @@ def main() -> None:
     assert verified_branch < whatsapp_branch < end_verified_branch
     assert "phoneVerifiedAt" in INVITATION_JS
     assert "Confirmă numărul" in INVITATION_JS
-    assert "Introdu PIN-ul tău din 6 cifre" in INVITATION_JS
+    assert "PIN-ul tău din 6 cifre" in INVITATION_JS
 
     MAIN_HTML = (ROOT / "public" / "index.html").read_text(encoding="utf-8")
     MAIN_JS = (ROOT / "public" / "app.js").read_text(encoding="utf-8")
