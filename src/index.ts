@@ -1303,6 +1303,10 @@ export default {
     const staticPages: Record<string, string> = {
       "/invitation": "invitation.html",
       "/invitation/": "invitation.html",
+      "/account": "account.html",
+      "/account/": "account.html",
+      "/prezenta": "attendance.html",
+      "/prezenta/": "attendance.html",
       "/termeni": "termeni.html",
       "/confidentialitate": "confidentialitate.html"
     };
