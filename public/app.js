@@ -311,7 +311,7 @@ function downloadBlob(filename, blob) {
   document.body.append(link);
   link.click();
   link.remove();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 function downloadAttendanceXlsx(matrix) {
   const allRows = [matrix.header, ...matrix.rows];
