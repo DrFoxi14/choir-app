@@ -26,10 +26,11 @@ interface Env {
 interface ChoirRow { id: string; slug: string; name: string; }
 interface SessionRow {
   sessionId: string; userId: string; displayName: string; role: Role;
-  voicePart: VoicePart | null; choirId: string; choirSlug: string; choirName: string;
+  voicePart: VoicePart | null; phoneNumber: string | null;
+  choirId: string; choirSlug: string; choirName: string;
 }
 interface UserPinRow {
-  id: string; display_name: string; login_code_hash: string;
+  id: string; display_name: string; login_code_hash: string; phone_number: string | null;
   pin_salt: string; pin_hash: string; role: Role; voice_part: VoicePart | null;
   choir_id: string; choir_slug: string; choir_name: string;
 }
@@ -207,7 +208,7 @@ async function getCurrentSession(request: Request, env: Env): Promise<SessionRow
   if (!choir) return null;
   const now = new Date().toISOString();
   const result = await env.DB.prepare(
-    "SELECT s.id AS sessionId, u.id AS userId, u.display_name AS displayName, " +
+    "SELECT s.id AS sessionId, u.id AS userId, u.display_name AS displayName, u.email_normalized AS phoneNumber, " +
     "m.role AS role, m.voice_part AS voicePart, c.id AS choirId, c.slug AS choirSlug, c.name AS choirName " +
     "FROM sessions s JOIN users u ON u.id = s.user_id " +
     "JOIN choir_memberships m ON m.user_id = u.id AND m.choir_id = ? " +
@@ -353,7 +354,7 @@ async function bootstrapOwner(request: Request, env: Env): Promise<Response> {
   }
   return json({
     authenticated: true,
-    user: { displayName, role: "owner", voicePart: null, choirName: choir.name },
+    user: { displayName, role: "owner", voicePart: null, phoneNumber: null, choirName: choir.name },
     loginCode: formatCode(loginCode),
     message: "Păstrează codul contului. Este afișat o singură dată."
   }, 200, { "Set-Cookie": sessionCookie(request, token, SESSION_DAYS * 86400) });
@@ -437,7 +438,7 @@ async function activateAccount(request: Request, env: Env): Promise<Response> {
   }
   return json({
     authenticated: true,
-    user: { displayName, role: candidate.intended_role, voicePart: candidate.voice_part, choirName: choir.name },
+    user: { displayName, role: candidate.intended_role, voicePart: candidate.voice_part, phoneNumber, choirName: choir.name },
     phoneLoginEnabled: true,
     message: "Cont activat. De acum, conectarea se face cu numărul de telefon și PIN-ul."
   }, 200, { "Set-Cookie": sessionCookie(request, token, SESSION_DAYS * 86400) });
@@ -464,14 +465,14 @@ async function login(request: Request, env: Env): Promise<Response> {
   if (!choir || !env.DB) return fail("choir_not_configured", "Corul nu este configurat.", 503);
   const result = phoneNumber
     ? await env.DB.prepare(
-      "SELECT u.id, u.display_name, u.login_code_hash, u.pin_salt, u.pin_hash, " +
+      "SELECT u.id, u.display_name, u.login_code_hash, u.email_normalized AS phone_number, u.pin_salt, u.pin_hash, " +
       "m.role, m.voice_part, c.id AS choir_id, c.slug AS choir_slug, c.name AS choir_name " +
       "FROM users u JOIN choir_memberships m ON m.user_id = u.id AND m.choir_id = ? " +
       "JOIN choirs c ON c.id = m.choir_id " +
       "WHERE u.email_normalized = ? AND u.status = 'active' AND m.status = 'active' AND c.status = 'active' LIMIT 1"
     ).bind(choir.id, phoneNumber).all<UserPinRow>()
     : await env.DB.prepare(
-      "SELECT u.id, u.display_name, u.login_code_hash, u.pin_salt, u.pin_hash, " +
+      "SELECT u.id, u.display_name, u.login_code_hash, u.email_normalized AS phone_number, u.pin_salt, u.pin_hash, " +
       "m.role, m.voice_part, c.id AS choir_id, c.slug AS choir_slug, c.name AS choir_name " +
       "FROM users u JOIN choir_memberships m ON m.user_id = u.id AND m.choir_id = ? " +
       "JOIN choirs c ON c.id = m.choir_id " +
@@ -487,7 +488,7 @@ async function login(request: Request, env: Env): Promise<Response> {
   await recordAudit(env, choir.id, user.id, "session.created", "session", sessionId);
   return json({
     authenticated: true,
-    user: { displayName: user.display_name, role: user.role, voicePart: user.voice_part, choirName: user.choir_name }
+    user: { displayName: user.display_name, role: user.role, voicePart: user.voice_part, phoneNumber: user.phone_number, choirName: user.choir_name }
   }, 200, { "Set-Cookie": sessionCookie(request, session.token, SESSION_DAYS * 86400) });
 }
 async function resetAccess(request: Request, env: Env): Promise<Response> {
@@ -562,6 +563,54 @@ async function resetAccess(request: Request, env: Env): Promise<Response> {
     ? "PIN schimbat. Conectează-te cu numărul de telefon și noul PIN."
     : "PIN schimbat. Conectează-te cu codul vechi al contului și noul PIN." },
     200, { "Set-Cookie": sessionCookie(request, "", 0) });
+}
+async function updateAccountPhone(request: Request, env: Env): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  const body = await readJson(request);
+  if (!body) return fail("invalid_request", "Cerere invalidă.", 400);
+  const phoneNumber = normalizePhone(body.phone);
+  const pin = body.pin;
+  if (!phoneNumber || !validPin(pin)) {
+    return fail("invalid_fields", "Introdu un număr de mobil românesc valid și PIN-ul actual din 6 cifre.", 400);
+  }
+  if (!(await allowAttempt(request, env, "phone-change-ip", 12)) ||
+      !(await allowAttempt(request, env, "phone-change-account", 5, current.userId))) {
+    return fail("rate_limited", "Prea multe încercări. Reîncearcă peste 15 minute.", 429);
+  }
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const credentials = await env.DB.prepare(
+    "SELECT pin_salt, pin_hash FROM users WHERE id = ? AND status = 'active' LIMIT 1"
+  ).bind(current.userId).all<{ pin_salt: string; pin_hash: string }>();
+  const account = credentials.results?.[0];
+  const calculatedHash = await derivePinHash(pin as string, account?.pin_salt || "00000000000000000000000000000000");
+  if (!account?.pin_hash || !constantTimeEqual(calculatedHash, account.pin_hash)) {
+    return fail("invalid_pin", "PIN-ul actual nu este corect.", 401);
+  }
+  const existing = await env.DB.prepare(
+    "SELECT id FROM users WHERE email_normalized = ? AND id <> ? LIMIT 1"
+  ).bind(phoneNumber, current.userId).all<{ id: string }>();
+  if (existing.results?.length) {
+    return fail("phone_in_use", "Numărul acesta este deja asociat altui cont.", 409);
+  }
+  let result: D1Result;
+  try {
+    result = await env.DB.prepare(
+      "UPDATE users SET email_normalized = ?, updated_at = ? " +
+      "WHERE id = ? AND status = 'active' AND EXISTS " +
+      "(SELECT 1 FROM choir_memberships WHERE user_id = ? AND choir_id = ? AND status = 'active') " +
+      "AND NOT EXISTS (SELECT 1 FROM users WHERE email_normalized = ? AND id <> ?)"
+    ).bind(phoneNumber, new Date().toISOString(), current.userId, current.userId,
+      current.choirId, phoneNumber, current.userId).run();
+  } catch {
+    return fail("phone_in_use", "Nu am putut salva numărul. Verifică dacă nu este deja folosit de alt cont.", 409);
+  }
+  if (Number(result.meta?.changes || 0) !== 1) {
+    return fail("phone_in_use", "Numărul acesta este deja asociat altui cont sau contul nu mai este activ.", 409);
+  }
+  await recordAudit(env, current.choirId, current.userId, "account.phone.updated", "user", current.userId,
+    { phoneUpdated: true });
+  return json({ ok: true, phoneNumber, message: "Numărul de telefon a fost actualizat." });
 }
 async function logout(request: Request, env: Env): Promise<Response> {
   const session = await getCurrentSession(request, env);
@@ -770,7 +819,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       authenticated: true,
       user: {
         id: current.userId, displayName: current.displayName, role: current.role,
-        voicePart: current.voicePart, choirName: current.choirName
+        voicePart: current.voicePart, phoneNumber: current.phoneNumber, choirName: current.choirName
       }
     } : { authenticated: false, authenticationConfigured: true });
   }
@@ -785,6 +834,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === "POST" && path === "/api/auth/login") return login(request, env);
   if (request.method === "POST" && path === "/api/auth/logout") return logout(request, env);
   if (request.method === "POST" && path === "/api/auth/reset-access") return resetAccess(request, env);
+  if (request.method === "POST" && path === "/api/account/phone") return updateAccountPhone(request, env);
   if (request.method === "GET" && path === "/api/songs") return listSongs(request, env);
   if (request.method === "GET" && path === "/api/conductor/members") return listMembers(request, env);
   if (request.method === "GET" && path === "/api/conductor/invitations") return listInvitations(request, env);
