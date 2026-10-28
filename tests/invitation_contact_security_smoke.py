@@ -61,9 +61,20 @@ def main() -> None:
         assert old_selector not in MAIN_JS, f"Main page still references moved UI: {old_selector}"
 
 
+    # New invitation codes do not collect a phone number from the conductor;
+    # the member supplies the number during activation. Legacy codes may stay bound.
+    create_invitation = function_body("createInvitation", "async function revokeInvitation")
+    assert "normalizePhone(body.phone)" not in create_invitation
+    assert "phoneHash" not in create_invitation
+    activation_flow = function_body("activateAccount", "async function login")
+    assert "if (candidate.intended_phone_hash)" in activation_flow
+    INVITATION_HTML = (ROOT / "public" / "invitation.html").read_text(encoding="utf-8")
+    assert 'id="invitation-phone"' not in INVITATION_HTML
+    assert "își va completa propriul număr la activare" in INVITATION_HTML
+
     # Legal notices must be linked, and the current versions must be enforced server-side.
-    assert 'const TERMS_VERSION = "2026-10-28-v1"' in WORKER
-    assert 'const PRIVACY_VERSION = "2026-10-28-v1"' in WORKER
+    assert 'const TERMS_VERSION = "2026-10-28-v2"' in WORKER
+    assert 'const PRIVACY_VERSION = "2026-10-28-v2"' in WORKER
     assert 'body.acceptedLegal !== true' in WORKER
     assert 'action = \'legal.terms.accepted\'' in WORKER
     assert 'legalAcceptanceRequired: !(await hasCurrentLegalAcceptance' in WORKER
