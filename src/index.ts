@@ -1006,7 +1006,7 @@ async function getAttendanceReport(request: Request, env: Env): Promise<Response
     env.DB.prepare(
       "SELECT m.id AS membershipId, u.display_name AS displayName, m.role, m.voice_part AS voicePart " +
       "FROM choir_memberships m JOIN users u ON u.id = m.user_id " +
-      "WHERE m.choir_id = ? AND m.status != 'invited' AND u.status = 'active' " +
+      "WHERE m.choir_id = ? AND m.status != 'invited' " +
       "ORDER BY u.display_name COLLATE NOCASE"
     ).bind(current.choirId).all<{ membershipId: string; displayName: string; role: Role; voicePart: VoicePart | null }>(),
     env.DB.prepare(
