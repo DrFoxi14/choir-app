@@ -27,6 +27,8 @@ assert 'href="/invitation">Deschide invitații, contacte și membri</a>' in home
 # Account settings must not add the phone form to the first screen; it is revealed by one button.
 assert 'id="phone-change-toggle"' in account and 'Schimbă numărul' in account
 assert 'id="phone-change-panel" class="phone-change-panel" hidden' in account
+assert ".account-page-content[hidden], .attendance-page-content[hidden]" in styles
+assert "document.documentElement.dataset.accentTheme" in (root / "public" / "app.js").read_text()
 assert 'id="phone-form"' not in home, "Phone form should not remain on the main dashboard"
 assert 'id="preferences-form"' not in home, "Palette form should be on /account"
 
