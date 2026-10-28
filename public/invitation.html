@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172554">
+  <meta name="description" content="Zonă protejată pentru dirijorii Corului Tabor: invitații și contacte pentru administrarea corului.">
+  <title>Invitații și contacte · Corul Tabor</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/invitation.js" defer></script>
+</head>
+<body>
+  <main class="invitation-shell">
+    <header class="invitation-topbar">
+      <div class="brand-mark" aria-hidden="true">♪</div>
+      <div class="brand-copy">
+        <p class="eyebrow">CORUL TABOR</p>
+        <h1>Invitații și contacte</h1>
+      </div>
+      <a class="secondary-button back-link" href="/">Înapoi</a>
+    </header>
+
+    <p id="page-notice" class="invitation-notice" role="status" hidden></p>
+
+    <section id="login-panel" class="panel invitation-card" aria-labelledby="login-title" hidden>
+      <p class="eyebrow">ACCES DIRIJOR</p>
+      <h2 id="login-title">Conectare</h2>
+      <p class="muted">Introdu numărul de telefon (sau codul contului) și PIN-ul de 6 cifre. Numerele membrilor sunt afișate numai după verificarea PIN-ului.</p>
+      <form id="login-form" class="form-stack">
+        <label for="login-code">Număr de telefon sau cod de cont</label>
+        <input id="login-code" name="loginCode" autocomplete="username" required>
+        <label for="login-pin">PIN / parolă de acces (6 cifre)</label>
+        <input id="login-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required>
+        <button class="primary-button" type="submit">Conectare</button>
+        <p id="login-message" class="form-message" role="status"></p>
+      </form>
+    </section>
+
+    <section id="unlock-panel" class="panel invitation-card" aria-labelledby="unlock-title" hidden>
+      <p class="eyebrow">VERIFICARE SUPLIMENTARĂ</p>
+      <h2 id="unlock-title">Confirmă identitatea</h2>
+      <p class="muted">Pentru a vedea numerele de telefon ale membrilor, introdu din nou PIN-ul personal. Lista nu este stocată în browser.</p>
+      <form id="unlock-form" class="form-stack">
+        <label for="unlock-pin">PIN / parolă de acces (6 cifre)</label>
+        <input id="unlock-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required>
+        <button class="primary-button" type="submit">Deblochează contactele</button>
+        <p id="unlock-message" class="form-message" role="status"></p>
+      </form>
+      <button id="unlock-logout" class="text-button" type="button">Nu e contul meu? Deconectare</button>
+    </section>
+
+    <section id="forbidden-panel" class="panel invitation-card" hidden>
+      <h2>Acces rezervat dirijorilor</h2>
+      <p class="muted">Contul conectat nu are drepturi de dirijor pentru acest cor. Numerele de telefon nu au fost încărcate.</p>
+      <a class="secondary-button back-link" href="/">Înapoi la aplicație</a>
+    </section>
+
+    <section id="dashboard-panel" hidden>
+      <section class="panel invitation-card" aria-labelledby="invite-title">
+        <p class="eyebrow">ZONA DIRIJORILOR</p>
+        <h2 id="invite-title">Invită un membru</h2>
+        <p class="muted">Codurile sunt valabile 7 zile, pot fi folosite o singură dată și sunt asociate numărului introdus.</p>
+        <form id="invitation-form" class="form-stack">
+          <label for="invitation-role">Tipul contului</label>
+          <select id="invitation-role" name="role">
+            <option value="member">Membru al corului</option>
+            <option id="conductor-option" value="conductor" hidden>Dirijor</option>
+          </select>
+          <label for="invitation-phone">Numărul de telefon al persoanei</label>
+          <input id="invitation-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0754 322 323" required>
+          <div id="voice-group">
+            <label for="invitation-voice">Vocea membrului</label>
+            <select id="invitation-voice" name="voicePart" required>
+              <option value="S">Sopran</option>
+              <option value="A">Alto</option>
+              <option value="T">Tenor</option>
+              <option value="B">Bas</option>
+            </select>
+          </div>
+          <button class="primary-button" type="submit">Generează invitația</button>
+          <p id="invite-message" class="form-message" role="status"></p>
+        </form>
+        <div id="issued-code" class="invitation-notice" hidden>
+          <p id="issued-code-title"><strong>Cod de invitație</strong></p>
+          <p id="issued-code-value" class="contact-phone"></p>
+          <p id="issued-code-description" class="muted compact"></p>
+          <div class="contact-actions">
+            <button id="copy-code" class="secondary-button" type="button">Copiază codul</button>
+            <button id="hide-code" class="secondary-button" type="button">Ascunde codul</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel invitation-card" aria-labelledby="contacts-title" style="margin-top:16px">
+        <div class="section-heading">
+          <div>
+            <h2 id="contacts-title">Lista membrilor</h2>
+            <p class="muted compact">Numerele sunt vizibile numai dirijorilor din acest cor. Folosește-le doar pentru coordonarea corului.</p>
+          </div>
+          <button id="refresh-contacts" class="secondary-button" type="button">Reîncarcă</button>
+        </div>
+        <label for="contact-search">Caută după nume sau telefon</label>
+        <input id="contact-search" type="search" placeholder="Caută un membru…" autocomplete="off">
+        <p id="contacts-message" class="invitation-count" role="status"></p>
+        <div id="contact-list" class="contact-list"></div>
+      </section>
+
+      <section class="panel invitation-card" aria-labelledby="invitations-title" style="margin-top:16px">
+        <div class="section-heading">
+          <h2 id="invitations-title">Invitații active</h2>
+          <button id="refresh-invitations" class="secondary-button" type="button">Reîncarcă</button>
+        </div>
+        <p id="invitations-message" class="invitation-count" role="status"></p>
+        <div id="invitation-list" class="invitation-list"></div>
+      </section>
+      <p class="muted compact">La finalul lucrului, deconectează-te dacă folosești un dispozitiv comun.</p>
+      <button id="logout-button" class="secondary-button" type="button">Deconectare</button>
+    </section>
+
+    <footer>
+      <p>Corul Tabor · Choir App</p>
+      <p>Acces protejat pentru administrarea invitațiilor și contactelor.</p>
+    </footer>
+  </main>
+</body>
+</html>
