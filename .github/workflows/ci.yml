@@ -32,7 +32,9 @@ jobs:
         run: npx wrangler deploy --dry-run
 
       - name: Check browser JavaScript syntax
-        run: node --check public/app.js
+        run: |
+          node --check public/app.js
+          node --check public/invitation.js
 
       - name: Smoke-test D1 migrations
         run: python3 tests/schema_smoke.py
