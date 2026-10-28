@@ -75,6 +75,7 @@ function renderContacts() {
   for (const member of members) {
     const phone = String(member.phoneNumber || "").trim();
     const verified = Boolean(Number(member.phoneVerified));
+    const canManage = Boolean(state.user) && (state.user.role === "owner" || member.role === "member");
     const card = document.createElement("article");
     card.className = "contact-card";
     const main = document.createElement("div");
@@ -110,12 +111,14 @@ function renderContacts() {
       const actions = document.createElement("div");
       actions.className = "contact-actions";
 
-      const verifyButton = document.createElement("button");
-      verifyButton.type = "button";
-      verifyButton.className = verified ? "secondary-button" : "primary-button";
-      verifyButton.textContent = verified ? "Elimină bifa" : "Confirmă numărul";
-      verifyButton.addEventListener("click", () => openPhoneVerificationForm(member, actions, verifyButton));
-      actions.append(verifyButton);
+      if (canManage) {
+        const verifyButton = document.createElement("button");
+        verifyButton.type = "button";
+        verifyButton.className = verified ? "secondary-button" : "primary-button";
+        verifyButton.textContent = verified ? "Elimină bifa" : "Confirmă numărul";
+        verifyButton.addEventListener("click", () => openPhoneVerificationForm(member, actions, verifyButton));
+        actions.append(verifyButton);
+      }
 
       if (verified) {
         const waNumber = phoneForWhatsApp(phone);
@@ -148,7 +151,7 @@ function renderContacts() {
           "WhatsApp este dezactivat până când dirijorul confirmă numărul printr-un canal separat.");
       }
 
-      if (state.user && (state.user.role === "owner" || member.role === "member")) {
+      if (canManage) {
         const resetButton = document.createElement("button");
         resetButton.className = "secondary-button";
         resetButton.type = "button";
