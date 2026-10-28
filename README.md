@@ -74,7 +74,7 @@ If a member loses the account code, a dirijor can generate a replacement; the ol
 
 The current Cloudflare Worker is connected to **DrFoxi14/choir-app** with **main** as its production branch and **npx wrangler deploy** as the deploy command. Pushes merged to main are therefore handled by Cloudflare's native Git integration.
 
-Keep the GitHub Actions **Deploy Choir App** workflow disabled unless the deployment method is deliberately changed. Do not run two production deploy systems at once. The **ENABLE_CLOUDFLARE_DEPLOY** variable controls the separate manual GitHub Actions workflow, not Cloudflare's native Git integration.
+The GitHub Actions **Deploy Choir App** workflow is manual and guarded by the repository Actions variable **ENABLE_CLOUDFLARE_DEPLOY=true**. It lists and applies pending D1 migrations before deploying the Worker. The Cloudflare token must be scoped to the dedicated Tabor account and include D1 Edit plus the Workers permission needed to create/deploy the Worker. If Cloudflare native Git integration is configured, disable one deployment path so two systems do not deploy to production independently.
 
 The current Worker name is **cor**, with the expected URL **https://cor.tabororadea.workers.dev**. The D1 binding is configured in wrangler.toml. Do not create R2 buckets or enable paid storage until the private media delivery design is ready.
 
