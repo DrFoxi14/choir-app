@@ -29,6 +29,7 @@ migrations_dir = "migrations"
 #
 # Do not add API tokens or other secrets to this file.
 
+# Temporary secret-refresh Preview branch; do not merge this branch.
 # Isolated database and variables for Cloudflare Worker Previews.
 [previews.vars]
 DEFAULT_CHOIR_SLUG = "tabor"
