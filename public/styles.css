@@ -318,7 +318,6 @@ html[data-accent-theme="berry"] { --accent: #D778A5; --navy: #853456; --accent-i
 .account-page-content { display: grid; gap: 16px; }
 .account-card h2 { margin-bottom: 8px; }
 .account-card .muted:last-child { margin-bottom: 0; }
-.theme-option code { margin-left: auto; color: #6A5149; font-size: .76rem; background: #FFF1EC; padding: 3px 5px; border-radius: 5px; }
 .phone-change-toggle { margin-top: 3px; }
 .account-phone-value { font-weight: 650; margin-bottom: 12px; overflow-wrap: anywhere; }
 .phone-change-panel { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
