@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#DE7356">
+  <meta name="description" content="Evidența prezenței la repetițiile Corului Tabor, accesibilă dirijorilor.">
+  <title>Prezență · Choir App</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/attendance.js" defer></script>
+</head>
+<body>
+  <main class="invitation-shell">
+    <header class="invitation-topbar">
+      <div class="brand-mark" aria-hidden="true">♪</div>
+      <div class="brand-copy">
+        <p class="eyebrow">CORUL TABOR</p>
+        <h1>Prezență la repetiții</h1>
+      </div>
+      <a class="secondary-button back-link" href="/">Înapoi la aplicație</a>
+    </header>
+
+    <p id="attendance-page-notice" class="invitation-notice" role="status" hidden></p>
+    <p id="attendance-page-loading" class="muted">Se verifică accesul…</p>
+
+    <section id="attendance-content" class="panel invitation-card attendance-page-content" hidden>
+      <p class="eyebrow">ZONA DIRIJORILOR</p>
+      <h2>Înregistrează prezența</h2>
+      <p id="attendance-user-line" class="muted compact"></p>
+      <p class="muted">Selectează un status pentru fiecare persoană, apoi salvează repetiția. Poți exporta istoricul pe un interval ales în Excel sau Markdown.</p>
+
+      <form id="attendance-form" class="form-stack">
+        <label for="attendance-date">Data repetiției</label>
+        <input id="attendance-date" name="date" type="date" required>
+        <label for="attendance-title">Denumirea repetiției</label>
+        <input id="attendance-title" name="title" type="text" maxlength="80" value="Repetiție" required>
+        <div class="attendance-roster-heading">
+          <h3>Lista membrilor</h3>
+          <button id="attendance-reload" class="secondary-button" type="button">Reîncarcă lista</button>
+        </div>
+        <div id="attendance-roster" class="attendance-roster" aria-live="polite">
+          <p class="muted compact">Se încarcă lista membrilor…</p>
+        </div>
+        <button class="primary-button" type="submit">Salvează prezența</button>
+        <p id="attendance-message" class="form-message" role="status"></p>
+      </form>
+
+      <hr class="section-divider">
+      <div class="attendance-export">
+        <h3>Export istoric</h3>
+        <p class="muted compact">Fișierele sunt generate în browser și descărcate direct pe dispozitiv. Nu folosesc R2.</p>
+        <div class="attendance-date-range">
+          <div><label for="attendance-from">De la</label><input id="attendance-from" type="date" required></div>
+          <div><label for="attendance-to">Până la</label><input id="attendance-to" type="date" required></div>
+        </div>
+        <div class="inline-actions">
+          <button id="attendance-export-xlsx" class="secondary-button" type="button">Descarcă Excel (.xlsx)</button>
+          <button id="attendance-export-md" class="secondary-button" type="button">Descarcă Markdown (.md)</button>
+        </div>
+        <p id="attendance-export-message" class="form-message" role="status"></p>
+      </div>
+    </section>
+
+    <footer>
+      <p>Corul Tabor · Choir App</p>
+      <p><a href="/invitation">Invitații, contacte și membri</a> · <a href="/termeni">Termeni</a> · <a href="/confidentialitate">Confidențialitate</a></p>
+    </footer>
+  </main>
+</body>
+</html>
