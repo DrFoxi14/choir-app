@@ -139,8 +139,12 @@ footer p { margin-bottom: 5px; }
 .invitation-empty { color: var(--muted); padding: 14px 0; }
 .invitation-count { font-size: .87rem; color: var(--muted); }
 .invitation-shell [hidden] { display: none !important; }
+/* Keep contact details full-width; the multi-action toolbar must not shrink the details column. */
+.contact-card > div:first-child { min-width: 0; }
+.contact-actions { min-width: 0; align-items: center; }
+.contact-warning { flex: 1 1 260px; min-width: 0; }
 @media (min-width: 640px) {
-  .contact-card { grid-template-columns: minmax(0, 1fr) auto; align-items: center; }
+  .contact-card { grid-template-columns: minmax(0, 1fr); align-items: stretch; }
 }
 
 .invitation-section-spaced { margin-top: 16px; }
