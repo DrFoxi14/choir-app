@@ -75,7 +75,7 @@ def main() -> None:
 
     # Legal notices must be linked, and the current versions must be enforced server-side.
     assert 'const TERMS_VERSION = "2026-10-28-v2"' in WORKER
-    assert 'const PRIVACY_VERSION = "2026-10-28-v2"' in WORKER
+    assert 'const PRIVACY_VERSION = "2026-10-28-v3"' in WORKER
     assert 'body.acceptedLegal !== true' in WORKER
     assert 'action = \'legal.terms.accepted\'' in WORKER
     assert 'legalAcceptanceRequired: !(await hasCurrentLegalAcceptance' in WORKER
