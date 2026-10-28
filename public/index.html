@@ -36,12 +36,14 @@
       <form id="phone-form" class="form-stack">
         <label for="account-phone">Număr de telefon</label>
         <input id="account-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0754 322 323" required>
+        <label for="account-phone-code">Cod de schimbare primit de la dirijor</label>
+        <input id="account-phone-code" name="code" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH-JKLM-NPQR" required>
         <label for="account-phone-pin">PIN-ul actual</label>
         <input id="account-phone-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required>
         <button class="primary-button" type="submit">Salvează numărul</button>
         <p id="phone-message" class="form-message" role="status"></p>
       </form>
-      <p class="muted compact">Numărul nu este verificat prin SMS în această versiune. Păstrează-l corect ca să te poți conecta cu el.</p>
+      <p class="muted compact">Pentru a adăuga sau schimba numărul, cere unui dirijor un cod dedicat acelui număr. Codul expiră în 30 de minute și nu poate fi folosit pentru alt număr.</p>
     </section>
 
     <section id="setup-screen" class="panel auth-panel hidden" aria-labelledby="setup-title">
@@ -153,6 +155,8 @@
             <option value="member">Membru al corului</option>
             <option id="conductor-invite-option" value="conductor" hidden>Dirijor</option>
           </select>
+          <label for="invitation-phone">Numărul de telefon al persoanei</label>
+          <input id="invitation-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0754 322 323" required>
           <div id="invitation-voice-group">
             <label for="invitation-voice">Vocea membrului</label>
             <select id="invitation-voice" name="voicePart" required>
@@ -163,7 +167,7 @@
             </select>
           </div>
           <button class="primary-button" type="submit">Generează cod de invitație</button>
-          <p class="muted compact">Codul este valabil 7 zile și poate fi folosit o singură dată.</p>
+          <p class="muted compact">Codul este valabil 7 zile, poate fi folosit o singură dată și funcționează doar cu numărul introdus aici.</p>
           <p id="invitation-message" class="form-message" role="status"></p>
         </form>
       </section>
