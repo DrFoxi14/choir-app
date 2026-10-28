@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#DE7356">
+  <meta name="description" content="Preferințele și setările contului Choir App.">
+  <title>Contul meu · Choir App</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/account.js" defer></script>
+</head>
+<body>
+  <main class="invitation-shell">
+    <header class="invitation-topbar">
+      <div class="brand-mark" aria-hidden="true">♪</div>
+      <div class="brand-copy">
+        <p class="eyebrow">CORUL TABOR</p>
+        <h1>Contul meu</h1>
+      </div>
+      <a class="secondary-button back-link" href="/">Înapoi la aplicație</a>
+    </header>
+
+    <p id="account-notice" class="invitation-notice" role="status" hidden></p>
+    <p id="account-loading" class="muted">Se încarcă setările contului…</p>
+
+    <section id="account-content" class="account-page-content" hidden>
+      <section class="panel invitation-card account-card" aria-labelledby="account-profile-title">
+        <p class="eyebrow">PROFIL</p>
+        <h2 id="account-profile-title">Setările mele</h2>
+        <p id="account-user-line" class="muted"></p>
+        <p class="muted compact">Preferințele sunt salvate în contul tău și se păstrează când te conectezi de pe alt dispozitiv.</p>
+      </section>
+
+      <section class="panel invitation-card account-card" aria-labelledby="palette-title">
+        <p class="eyebrow">ASPECT</p>
+        <h2 id="palette-title">Paleta mea de culori</h2>
+        <p class="muted">Alege o culoare luminoasă pentru accentele aplicației.</p>
+        <form id="preferences-form" class="form-stack preferences-form">
+          <fieldset class="theme-picker">
+            <legend>Alege o paletă</legend>
+            <label class="theme-option"><input type="radio" name="accentTheme" value="ocean"><span class="theme-swatch swatch-ocean" aria-hidden="true"></span><span>Albastru</span></label>
+            <label class="theme-option"><input type="radio" name="accentTheme" value="violet"><span class="theme-swatch swatch-violet" aria-hidden="true"></span><span>Lavandă</span></label>
+            <label class="theme-option"><input type="radio" name="accentTheme" value="emerald"><span class="theme-swatch swatch-emerald" aria-hidden="true"></span><span>Mentă</span></label>
+            <label class="theme-option"><input type="radio" name="accentTheme" value="rose"><span class="theme-swatch swatch-rose" aria-hidden="true"></span><span>Coral</span><code>#DE7356</code></label>
+            <label class="theme-option"><input type="radio" name="accentTheme" value="amber"><span class="theme-swatch swatch-amber" aria-hidden="true"></span><span>Mango</span></label>
+            <label class="theme-option"><input type="radio" name="accentTheme" value="teal"><span class="theme-swatch swatch-teal" aria-hidden="true"></span><span>Turcoaz</span></label>
+            <label class="theme-option"><input type="radio" name="accentTheme" value="slate"><span class="theme-swatch swatch-slate" aria-hidden="true"></span><span>Oțel deschis</span></label>
+            <label class="theme-option"><input type="radio" name="accentTheme" value="berry"><span class="theme-swatch swatch-berry" aria-hidden="true"></span><span>Roz zmeură</span></label>
+          </fieldset>
+          <button class="primary-button" type="submit">Salvează paleta</button>
+          <p id="preferences-message" class="form-message" role="status"></p>
+        </form>
+      </section>
+
+      <section class="panel invitation-card account-card" aria-labelledby="phone-title">
+        <p class="eyebrow">DATE DE CONTACT</p>
+        <h2 id="phone-title">Număr de telefon</h2>
+        <p id="account-current-phone" class="account-phone-value">Număr de telefon: încă nesetat</p>
+        <button id="phone-change-toggle" class="secondary-button phone-change-toggle" type="button" aria-expanded="false" aria-controls="phone-change-panel">Schimbă numărul</button>
+        <div id="phone-change-panel" class="phone-change-panel" hidden>
+          <p class="muted compact">Pentru siguranță, cere unui dirijor codul dedicat noului număr și confirmă schimbarea cu PIN-ul tău.</p>
+          <form id="phone-form" class="form-stack">
+            <label for="account-phone">Numărul nou</label>
+            <input id="account-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0754 322 323" required>
+            <label for="account-phone-code">Codul primit de la dirijor</label>
+            <input id="account-phone-code" name="code" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH-JKLM-NPQR" required>
+            <label for="account-phone-pin">PIN-ul actual</label>
+            <input id="account-phone-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required>
+            <button class="primary-button" type="submit">Salvează numărul</button>
+            <p id="phone-message" class="form-message" role="status"></p>
+          </form>
+          <p class="muted compact">Codul expiră după 30 de minute și este valabil doar pentru numărul pentru care a fost emis.</p>
+        </div>
+      </section>
+    </section>
+
+    <footer>
+      <p>Corul Tabor · Choir App</p>
+      <p><a href="/termeni">Termeni de utilizare</a> · <a href="/confidentialitate">Confidențialitate</a></p>
+    </footer>
+  </main>
+</body>
+</html>
