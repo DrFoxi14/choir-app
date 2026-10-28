@@ -2,8 +2,8 @@ type Role = "member" | "conductor" | "owner";
 type VoicePart = "S" | "A" | "T" | "B";
 
 // Bump these version strings whenever the actual documents are materially updated.
-const TERMS_VERSION = "2026-10-28-v1";
-const PRIVACY_VERSION = "2026-10-28-v1";
+const TERMS_VERSION = "2026-10-28-v2";
+const PRIVACY_VERSION = "2026-10-28-v2";
 
 interface D1Result<T = Record<string, unknown>> {
   results?: T[];
@@ -436,12 +436,13 @@ async function activateAccount(request: Request, env: Env): Promise<Response> {
       (candidate.intended_role === "member" && !isVoicePart(candidate.voice_part))) {
     return fail("invalid_activation_code", "Codul nu este valid, a expirat sau a fost deja folosit.", 400);
   }
-  if (!candidate.intended_phone_hash) {
-    return fail("invitation_phone_required", "Această invitație a fost creată înainte de asocierea numărului de telefon. Cere dirijorului o invitație nouă.", 409);
-  }
-  const submittedPhoneHash = await hmacHex(env.AUTH_SECRET || "", "activation-phone|" + phoneNumber);
-  if (!constantTimeEqual(candidate.intended_phone_hash, submittedPhoneHash)) {
-    return fail("phone_mismatch", "Numărul de telefon nu corespunde invitației. Verifică numărul sau contactează dirijorul.", 409);
+  // Legacy invitations may still be bound to a phone hash. New invitations
+  // do not collect a phone number from the conductor; the member supplies it here.
+  if (candidate.intended_phone_hash) {
+    const submittedPhoneHash = await hmacHex(env.AUTH_SECRET || "", "activation-phone|" + phoneNumber);
+    if (!constantTimeEqual(candidate.intended_phone_hash, submittedPhoneHash)) {
+      return fail("phone_mismatch", "Numărul de telefon nu corespunde acestei invitații mai vechi. Verifică numărul sau cere dirijorului o invitație nouă.", 409);
+    }
   }
   const userId = crypto.randomUUID();
   const membershipId = crypto.randomUUID();
@@ -962,7 +963,6 @@ async function createInvitation(request: Request, env: Env): Promise<Response> {
   if (!body) return fail("invalid_request", "Cerere invalidă.", 400);
   const role = body.role;
   const voicePart = body.voicePart;
-  const phoneNumber = normalizePhone(body.phone);
   if (role !== "member" && role !== "conductor") {
     return fail("invalid_role", "Rol invalid.", 400);
   }
@@ -975,17 +975,7 @@ async function createInvitation(request: Request, env: Env): Promise<Response> {
   if (role === "conductor" && voicePart !== null && voicePart !== undefined && !isVoicePart(voicePart)) {
     return fail("invalid_voice", "Voce invalidă.", 400);
   }
-  if (!phoneNumber) {
-    return fail("invalid_phone", "Introdu un număr de telefon mobil românesc valid pentru persoana invitată.", 400);
-  }
   if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
-  const existingPhone = await env.DB.prepare(
-    "SELECT id FROM users WHERE email_normalized = ? LIMIT 1"
-  ).bind(phoneNumber).all<{ id: string }>();
-  if (existingPhone.results?.length) {
-    return fail("phone_in_use", "Numărul acesta este deja asociat unui cont. Cere ajutorul dirijorului pentru contul existent.", 409);
-  }
-  const phoneHash = await hmacHex(env.AUTH_SECRET || "", "activation-phone|" + phoneNumber);
   const code = randomCode(16);
   const codeHash = await sha256(code);
   const id = crypto.randomUUID();
@@ -999,13 +989,13 @@ async function createInvitation(request: Request, env: Env): Promise<Response> {
     env.DB.prepare(
       "INSERT INTO audit_logs (id, choir_id, actor_user_id, action, target_type, target_id, metadata_json) " +
       "VALUES (?, ?, ?, 'activation_code.created', 'activation_code', ?, ?)"
-    ).bind(crypto.randomUUID(), current.choirId, current.userId, id, JSON.stringify({ role, voicePart: voice, phoneHash }))
+    ).bind(crypto.randomUUID(), current.choirId, current.userId, id, JSON.stringify({ role, voicePart: voice }))
   ];
   await env.DB.batch(statements);
   return json({
     invitation: { id, role, voicePart: voice, expiresAt },
     code: formatCode(code),
-    message: "Codul este valabil 7 zile și este legat de numărul introdus. Copiază-l și transmite-l numai persoanei respective."
+    message: "Codul este valabil 7 zile, poate fi folosit o singură dată și nu este legat de un număr de telefon. Membrul își introduce numărul la activare."
   }, 201);
 }
 async function revokeInvitation(request: Request, env: Env, invitationId: string): Promise<Response> {
