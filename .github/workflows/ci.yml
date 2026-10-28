@@ -36,3 +36,6 @@ jobs:
 
       - name: Smoke-test D1 migrations
         run: python3 tests/schema_smoke.py
+
+      - name: Smoke-test isolated Preview configuration
+        run: python3 tests/preview_config_smoke.py
