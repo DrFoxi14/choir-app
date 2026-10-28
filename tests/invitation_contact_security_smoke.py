@@ -28,9 +28,20 @@ def main() -> None:
     assert "phoneNumber" not in members
     assert "email_normalized" not in members
 
+    verification = function_body("updateMemberPhoneVerification", "async function createInvitation")
+    assert "requireSession(request, env)" in verification
+    assert "isConductor(current)" in verification
+    assert "manageableMember(env, current, targetId)" in verification
+    assert "validPin(body.pin)" in verification
+    assert "phone_verified_at" in verification
+    assert "phone_verified_by_user_id" in verification
+    assert "phone-verification-user" in verification
+    assert "recordAudit(" in verification
+
     # The route serves a dedicated asset, while data remains API-protected.
     assert 'url.pathname === "/invitation"' in WORKER
     assert 'path === "/api/conductor/contacts"' in WORKER
+    assert "phoneVerificationMatch" in WORKER
 
 
 if __name__ == "__main__":
