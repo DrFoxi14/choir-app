@@ -27,3 +27,18 @@ jobs:
 
       - name: Type-check Worker
         run: npm run typecheck
+
+      - name: Validate Wrangler configuration and Worker bundle
+        run: npx wrangler deploy --dry-run
+
+      - name: Check browser JavaScript syntax
+        run: node --check public/app.js
+
+      - name: Smoke-test D1 migrations
+        run: python3 tests/schema_smoke.py
+
+      - name: Smoke-test isolated Preview configuration
+        run: python3 tests/preview_config_smoke.py
+
+      - name: Smoke-test one-paste Preview D1 bootstrap
+        run: python3 tests/preview_d1_bootstrap_smoke.py
