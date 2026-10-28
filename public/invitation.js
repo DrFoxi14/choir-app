@@ -485,6 +485,13 @@ $("#legal-panel-form").addEventListener("submit", async (event) => {
   }
 });
 
+async function applySavedAccentTheme() {
+  try {
+    const data = await requestJSON("/api/account/preferences");
+    const allowed = ["ocean", "violet", "emerald", "rose", "amber", "teal", "slate", "berry"];
+    document.documentElement.dataset.accentTheme = allowed.includes(data.accentTheme) ? data.accentTheme : "ocean";
+  } catch { /* Unauthenticated pages keep the default accent. */ }
+}
 async function start() {
   let status = {};
   let session = {};
@@ -508,6 +515,7 @@ async function start() {
       showPanel("legal-panel");
       return;
     }
+    await applySavedAccentTheme();
     if (!["owner", "conductor"].includes(session.user.role)) {
       showPanel("forbidden-panel");
       return;
