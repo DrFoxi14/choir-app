@@ -61,6 +61,40 @@ def main() -> None:
         assert old_selector not in MAIN_JS, f"Main page still references moved UI: {old_selector}"
 
 
+    # Legal notices must be linked, and the current versions must be enforced server-side.
+    assert 'const TERMS_VERSION = "2026-10-28-v1"' in WORKER
+    assert 'const PRIVACY_VERSION = "2026-10-28-v1"' in WORKER
+    assert 'body.acceptedLegal !== true' in WORKER
+    assert 'action = \'legal.terms.accepted\'' in WORKER
+    assert 'legalAcceptanceRequired: !(await hasCurrentLegalAcceptance' in WORKER
+    assert 'path === "/api/legal/accept"' in WORKER
+    require_session = function_body("requireSession", "function isConductor")
+    assert "hasCurrentLegalAcceptance" in require_session
+    activation = function_body("activateAccount", "async function login")
+    assert "body.acceptedLegal !== true" in activation
+    assert "acceptedVia: \"account_activation\"" in activation
+    login = function_body("login", "async function acceptLegalTerms")
+    assert "legal_acceptance_required" in login
+    assert "recordLegalAcceptance" in login
+
+    LEGAL_HTML = (ROOT / "public" / "index.html").read_text(encoding="utf-8")
+    LEGAL_JS = (ROOT / "public" / "app.js").read_text(encoding="utf-8")
+    for control in ['id="setup-legal-accept"', 'id="activation-legal-accept"', 'id="legal-acceptance-form"']:
+        assert control in LEGAL_HTML, f"Missing legal acceptance UI: {control}"
+    assert 'acceptedLegal: $("#activation-legal-accept").checked' in LEGAL_JS
+    assert 'acceptedLegal: $("#setup-legal-accept").checked' in LEGAL_JS
+    assert 'acceptedLegal: $("#login-legal-accept").checked' in LEGAL_JS
+    assert 'requestJSON("/api/legal/accept", "POST", { acceptedLegal: true })' in LEGAL_JS
+    for path in ["termeni.html", "confidentialitate.html"]:
+        assert (ROOT / "public" / path).is_file(), f"Missing legal document: {path}"
+    assert '"/termeni": "termeni.html"' in WORKER
+    assert '"/confidentialitate": "confidentialitate.html"' in WORKER
+    privacy = (ROOT / "public" / "confidentialitate.html").read_text(encoding="utf-8")
+    assert "numărul nu este public" in privacy.lower()
+    assert "Cloudflare" in privacy
+    assert "ANSPDCP" in privacy
+
+
 
 if __name__ == "__main__":
     main()
