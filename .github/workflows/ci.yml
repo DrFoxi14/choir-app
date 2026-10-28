@@ -39,3 +39,6 @@ jobs:
 
       - name: Smoke-test isolated Preview configuration
         run: python3 tests/preview_config_smoke.py
+
+      - name: Smoke-test one-paste Preview D1 bootstrap
+        run: python3 tests/preview_d1_bootstrap_smoke.py
