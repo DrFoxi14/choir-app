@@ -22,6 +22,8 @@ assert '<script src="/account.js" defer></script>' in account
 assert '<script src="/attendance.js" defer></script>' in attendance
 assert '<a id="account-settings-toggle" href="/account"' in home
 assert 'href="/prezenta">Deschide prezența</a>' in home
+assert home.count('href="/invitation">Deschide invitații, contacte și membri</a>') == 1, "Invitation link should appear only inside conductor tools card"
+assert '<code>#DE7356</code>' not in account, "Do not show the Coral hex code in the palette label"
 assert 'href="/invitation">Deschide invitații, contacte și membri</a>' in home
 
 # Account settings must not add the phone form to the first screen; it is revealed by one button.
