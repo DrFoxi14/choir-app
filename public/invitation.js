@@ -417,10 +417,8 @@ $("#invitation-form").addEventListener("submit", async (event) => {
   try {
     const data = await requestJSON("/api/conductor/invitations", "POST", {
       role,
-      voicePart: role === "member" ? $("#invitation-voice").value : null,
-      phone: $("#invitation-phone").value
+      voicePart: role === "member" ? $("#invitation-voice").value : null
     });
-    $("#invitation-phone").value = "";
     showIssuedCode(data.code, data.message,
       role === "conductor" ? "Cod de invitație pentru dirijor" : "Cod de invitație pentru membru");
     await refreshInvitations();
