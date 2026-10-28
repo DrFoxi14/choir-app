@@ -5,8 +5,6 @@
 -- Do not re-run on a partially initialized database.
 PRAGMA foreign_keys = ON;
 
-PRAGMA foreign_keys = ON;
-
 CREATE TABLE IF NOT EXISTS choirs (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
