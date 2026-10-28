@@ -59,6 +59,10 @@
         <input id="setup-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
         <label for="setup-pin-confirm">Repetă PIN-ul</label>
         <input id="setup-pin-confirm" name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
+        <div class="legal-acceptance">
+          <input id="setup-legal-accept" name="acceptedLegal" type="checkbox" required>
+          <label for="setup-legal-accept">Am citit și accept <a href="/termeni" target="_blank" rel="noopener noreferrer">Termenii de utilizare</a> și confirm că am luat la cunoștință <a href="/confidentialitate" target="_blank" rel="noopener noreferrer">Nota de informare privind datele personale</a>.</label>
+        </div>
         <button class="primary-button" type="submit">Creează contul principal</button>
         <p id="setup-message" class="form-message" role="status"></p>
       </form>
@@ -73,6 +77,10 @@
         <input id="login-code" name="loginCode" type="text" inputmode="text" autocomplete="username" placeholder="0754 322 323" required>
         <label for="login-pin">PIN din 6 cifre</label>
         <input id="login-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required>
+        <div id="login-legal-accept-wrap" class="legal-acceptance" hidden>
+          <input id="login-legal-accept" name="acceptedLegal" type="checkbox">
+          <label for="login-legal-accept">Am citit și accept <a href="/termeni" target="_blank" rel="noopener noreferrer">Termenii de utilizare</a> și confirm că am luat la cunoștință <a href="/confidentialitate" target="_blank" rel="noopener noreferrer">Nota de informare privind datele personale</a>.</label>
+        </div>
         <button class="primary-button" type="submit">Conectare</button>
         <p id="login-message" class="form-message" role="status"></p>
       </form>
@@ -91,6 +99,10 @@
           <input id="activation-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
           <label for="activation-pin-confirm">Repetă PIN-ul</label>
           <input id="activation-pin-confirm" name="pinConfirm" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="new-password" required>
+          <div class="legal-acceptance">
+            <input id="activation-legal-accept" name="acceptedLegal" type="checkbox" required>
+            <label for="activation-legal-accept">Am citit și accept <a href="/termeni" target="_blank" rel="noopener noreferrer">Termenii de utilizare</a> și confirm că am luat la cunoștință <a href="/confidentialitate" target="_blank" rel="noopener noreferrer">Nota de informare privind datele personale</a>.</label>
+          </div>
           <button class="primary-button" type="submit">Activează contul</button>
           <p id="activate-message" class="form-message" role="status"></p>
         </form>
@@ -112,6 +124,20 @@
           <p id="reset-message" class="form-message" role="status"></p>
         </form>
       </details>
+    </section>
+
+    <section id="legal-acceptance-screen" class="panel auth-panel hidden" aria-labelledby="legal-acceptance-title">
+      <p class="eyebrow">ACTUALIZARE DOCUMENTE</p>
+      <h2 id="legal-acceptance-title">Termeni și confidențialitate</h2>
+      <p class="muted">Am actualizat documentele aplicației. Pentru a continua, citește-le și confirmă că le accepți. Nu există publicitate, profilare comercială sau vânzare de date în această aplicație.</p>
+      <form id="legal-acceptance-form" class="form-stack">
+        <div class="legal-acceptance">
+          <input id="existing-legal-accept" name="acceptedLegal" type="checkbox" required>
+          <label for="existing-legal-accept">Am citit și accept <a href="/termeni" target="_blank" rel="noopener noreferrer">Termenii de utilizare</a> și confirm că am luat la cunoștință <a href="/confidentialitate" target="_blank" rel="noopener noreferrer">Nota de informare privind datele personale</a>.</label>
+        </div>
+        <button class="primary-button" type="submit">Acceptă și continuă</button>
+        <p id="legal-acceptance-message" class="form-message" role="status"></p>
+      </form>
     </section>
 
     <section id="credentials-notice" class="panel credentials-panel hidden" aria-labelledby="credentials-title">
@@ -171,6 +197,7 @@
     <footer>
       <p>Corul Tabor · Choir App</p>
       <p id="app-status">Se verifică starea aplicației…</p>
+      <p><a href="/termeni">Termeni de utilizare</a> · <a href="/confidentialitate">Confidențialitate</a></p>
     </footer>
   </main>
 </body>
