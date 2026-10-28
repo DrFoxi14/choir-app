@@ -580,6 +580,7 @@ async function resetAccess(request: Request, env: Env): Promise<Response> {
 async function issuePhoneChangeCode(request: Request, env: Env, targetId: string): Promise<Response> {
   const current = await requireSession(request, env);
   if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot emite coduri pentru schimbarea numerelor.", 403);
   const target = await manageableMember(env, current, targetId);
   if (target instanceof Response) return target;
   const body = await readJson(request);
