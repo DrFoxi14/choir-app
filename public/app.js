@@ -141,12 +141,6 @@ function enterApp(user) {
   if (user.role === "owner" || user.role === "conductor") {
     showOnly("conductor");
     $("#conductor-role-badge").textContent = roleNames[user.role];
-    $("#conductor-invite-option").hidden = user.role !== "owner";
-    if (user.role !== "owner" && $("#invitation-role").value === "conductor") {
-      $("#invitation-role").value = "member";
-    }
-    updateInvitationForm();
-    refreshConductorData();
     loadSongs($("#conductor-voice").value, true);
   } else {
     showOnly("member");
@@ -165,11 +159,6 @@ function leaveApp() {
   hideIssuedCode();
   showOnly("auth");
 }
-function updateInvitationForm() {
-  const isConductorInvite = $("#invitation-role").value === "conductor";
-  $("#invitation-voice-group").classList.toggle("hidden", isConductorInvite);
-  $("#invitation-voice").required = !isConductorInvite;
-}
 async function checkHealth() {
   try {
     const data = await requestJSON("/api/health");
@@ -180,131 +169,6 @@ async function checkHealth() {
     $("#app-status").textContent = "Starea serviciului nu este disponibilă";
   }
 }
-async function refreshConductorData() {
-  setMessage("#members-message", "Se încarcă membrii…");
-  setMessage("#invitations-message", "Se încarcă invitațiile…");
-  try {
-    const data = await requestJSON("/api/conductor/members");
-    renderMembers(data.members || [], data.actorRole || state.user.role);
-    setMessage("#members-message", (data.members || []).length
-      ? "Conturi active: " + data.members.length
-      : "Nu există încă membri activați.");
-  } catch (error) {
-    setMessage("#members-message", error.message, "error");
-  }
-  try {
-    const data = await requestJSON("/api/conductor/invitations");
-    renderInvitations(data.invitations || [], data.actorRole || state.user.role);
-    setMessage("#invitations-message", (data.invitations || []).length
-      ? "Invitații nefolosite: " + data.invitations.length
-      : "Nu există invitații active.");
-  } catch (error) {
-    setMessage("#invitations-message", error.message, "error");
-  }
-}
-function renderMembers(members, actorRole) {
-  const list = $("#member-list");
-  list.replaceChildren();
-  for (const member of members) {
-    const card = document.createElement("article");
-    card.className = "managed-card";
-    const main = document.createElement("div");
-    main.className = "managed-card-main";
-    addText(main, "strong", "managed-name", member.displayName);
-    const details = [roleNames[member.role] || member.role];
-    if (member.voicePart) details.push(voiceNames[member.voicePart] || member.voicePart);
-    details.push("Adăugat: " + formatDate(member.joinedAt));
-    addText(main, "p", "muted compact", details.join(" · "));
-    card.append(main);
-    const canManage = actorRole === "owner" || member.role === "member";
-    if (canManage) {
-      const actions = document.createElement("div");
-      actions.className = "managed-actions";
-      const resetButton = document.createElement("button");
-      resetButton.type = "button";
-      resetButton.className = "secondary-button";
-      resetButton.textContent = "Cod resetare PIN";
-      resetButton.addEventListener("click", () => runMemberAction(member, "reset"));
-      const renewButton = document.createElement("button");
-      renewButton.type = "button";
-      renewButton.className = "secondary-button";
-      renewButton.textContent = "Cod cont nou";
-      renewButton.addEventListener("click", () => runMemberAction(member, "renew-login-code"));
-      const phoneButton = document.createElement("button");
-      phoneButton.type = "button";
-      phoneButton.className = "secondary-button";
-      phoneButton.textContent = "Cod schimbare telefon";
-      phoneButton.addEventListener("click", () => runPhoneChangeAction(member));
-      actions.append(resetButton, renewButton, phoneButton);
-      card.append(actions);
-    }
-    list.append(card);
-  }
-}
-async function runPhoneChangeAction(member) {
-  const phone = window.prompt("Introdu numărul de telefon nou pentru " + member.displayName + " (de ex. 0754 322 323):");
-  if (phone === null || !phone.trim()) return;
-  try {
-    const response = await requestJSON(
-      "/api/conductor/members/" + encodeURIComponent(member.id) + "/phone-change-code",
-      "POST", { phone }
-    );
-    showIssuedCode(response.code, response.message, "Cod schimbare telefon · " + member.displayName);
-  } catch (error) {
-    showNotice(error.message, "error");
-  }
-}
-
-function renderInvitations(invitations, actorRole) {
-  const list = $("#invitation-list");
-  list.replaceChildren();
-  for (const invite of invitations) {
-    const card = document.createElement("article");
-    card.className = "managed-card";
-    const main = document.createElement("div");
-    main.className = "managed-card-main";
-    const inviteType = invite.role === "conductor"
-      ? "Invitație pentru dirijor"
-      : "Invitație pentru membru · " + (voiceNames[invite.voicePart] || invite.voicePart || "voce nealocată");
-    addText(main, "strong", "managed-name", inviteType);
-    addText(main, "p", "muted compact",
-      "Creată de " + (invite.createdBy || "un dirijor") + " · expiră " + formatDate(invite.expiresAt));
-    card.append(main);
-    if (actorRole === "owner" || invite.role === "member") {
-      const revoke = document.createElement("button");
-      revoke.type = "button";
-      revoke.className = "secondary-button danger-button";
-      revoke.textContent = "Revocă";
-      revoke.addEventListener("click", async () => {
-        if (!confirm("Revoci această invitație? Codul nu va mai putea fi folosit.")) return;
-        try {
-          await requestJSON("/api/conductor/invitations/" + encodeURIComponent(invite.id) + "/revoke", "POST", {});
-          setMessage("#invitation-message", "Invitație revocată.", "success");
-          await refreshConductorData();
-        } catch (error) {
-          setMessage("#invitation-message", error.message, "error");
-        }
-      });
-      card.append(revoke);
-    }
-    list.append(card);
-  }
-}
-async function runMemberAction(member, action) {
-  const explanation = action === "reset"
-    ? "Cod de resetare PIN pentru " + member.displayName
-    : "Noul cod de conectare pentru " + member.displayName;
-  try {
-    const response = await requestJSON(
-      "/api/conductor/members/" + encodeURIComponent(member.id) + "/" + action,
-      "POST", {}
-    );
-    showIssuedCode(response.code, response.message || explanation, explanation);
-  } catch (error) {
-    showNotice(error.message, "error");
-  }
-}
-
 $("#setup-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const button = event.currentTarget.querySelector("button[type=submit]");
@@ -458,30 +322,6 @@ $("#copy-code-button").addEventListener("click", async () => {
   }
 });
 $("#hide-code-button").addEventListener("click", hideIssuedCode);
-$("#invitation-role").addEventListener("change", updateInvitationForm);
-$("#invitation-form").addEventListener("submit", async (event) => {
-  event.preventDefault();
-  const button = event.currentTarget.querySelector("button[type=submit]");
-  button.disabled = true;
-  setMessage("#invitation-message", "Se generează invitația…");
-  const role = $("#invitation-role").value;
-  try {
-    const data = await requestJSON("/api/conductor/invitations", "POST", {
-      role,
-      voicePart: role === "member" ? $("#invitation-voice").value : null,
-      phone: $("#invitation-phone").value
-    });
-    setMessage("#invitation-message", "Invitație creată.", "success");
-    showIssuedCode(data.code, data.message, role === "conductor" ? "Cod de invitație pentru dirijor" : "Cod de invitație pentru membru");
-    await refreshConductorData();
-  } catch (error) {
-    setMessage("#invitation-message", error.message, "error");
-  } finally {
-    button.disabled = false;
-  }
-});
-$("#refresh-members").addEventListener("click", refreshConductorData);
-$("#refresh-invitations").addEventListener("click", refreshConductorData);
 $("#conductor-voice").addEventListener("change", () => loadSongs($("#conductor-voice").value, true));
 
 async function start() {
