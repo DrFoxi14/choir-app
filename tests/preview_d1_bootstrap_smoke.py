@@ -4,7 +4,7 @@ import sqlite3
 root = Path(__file__).resolve().parents[1]
 db = sqlite3.connect(":memory:")
 db.execute("PRAGMA foreign_keys = ON")
-db.executescript((root / "docs" / "preview-d1-bootstrap.sql").read_text())
+db.executescript((root / "docs" / "preview-d1-bootstrap-flat.sql").read_text())
 
 expected_tables = {
     "choirs", "choir_domains", "users", "choir_memberships",
