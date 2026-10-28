@@ -7,9 +7,10 @@ const screens = {
   auth: $("#auth-screen"),
   member: $("#member-screen"),
   conductor: $("#conductor-screen"),
+  legal: $("#legal-acceptance-screen"),
   code: $("#credentials-notice")
 };
-const state = { user: null, issuedCode: "" };
+const state = { user: null, issuedCode: "", pendingLegalUser: null };
 
 async function requestJSON(path, method = "GET", body = undefined) {
   const headers = { Accept: "application/json" };
@@ -183,7 +184,8 @@ $("#setup-form").addEventListener("submit", async (event) => {
     const data = await requestJSON("/api/setup/bootstrap", "POST", {
       displayName: $("#setup-name").value,
       setupKey: $("#setup-key").value,
-      pin
+      pin,
+      acceptedLegal: $("#setup-legal-accept").checked
     });
     $("#setup-key").value = "";
     $("#setup-pin").value = "";
@@ -206,13 +208,19 @@ $("#login-form").addEventListener("submit", async (event) => {
   try {
     const data = await requestJSON("/api/auth/login", "POST", {
       loginCode: $("#login-code").value,
-      pin: $("#login-pin").value
+      pin: $("#login-pin").value,
+      acceptedLegal: $("#login-legal-accept").checked
     });
     $("#login-pin").value = "";
     setMessage("#login-message", "");
     enterApp(data.user);
   } catch (error) {
-    setMessage("#login-message", error.message, "error");
+    if (error.code === "legal_acceptance_required") {
+      $("#login-legal-accept-wrap").hidden = false;
+      setMessage("#login-message", "Citește documentele și bifează acceptarea, apoi apasă din nou „Conectare”.", "error");
+    } else {
+      setMessage("#login-message", error.message, "error");
+    }
   } finally {
     button.disabled = false;
   }
@@ -232,7 +240,8 @@ $("#activate-form").addEventListener("submit", async (event) => {
       code: $("#activation-code").value,
       displayName: $("#activation-name").value,
       phone: $("#activation-phone").value,
-      pin
+      pin,
+      acceptedLegal: $("#activation-legal-accept").checked
     });
     event.currentTarget.reset();
     enterApp(data.user);
@@ -243,7 +252,9 @@ $("#activate-form").addEventListener("submit", async (event) => {
       showIssuedCode(data.loginCode, data.message, "Codul tău de conectare");
     }
   } catch (error) {
-    setMessage("#activate-message", error.message, "error");
+    setMessage("#activate-message", error.code === "legal_acceptance_required"
+      ? "Bifează acceptarea Termenilor și confirmarea că ai citit Nota de informare."
+      : error.message, "error");
   } finally {
     button.disabled = false;
   }
@@ -324,6 +335,26 @@ $("#copy-code-button").addEventListener("click", async () => {
 $("#hide-code-button").addEventListener("click", hideIssuedCode);
 $("#conductor-voice").addEventListener("change", () => loadSongs($("#conductor-voice").value, true));
 
+$("#legal-acceptance-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector("button[type=submit]");
+  if (!$("#existing-legal-accept").checked) return;
+  button.disabled = true;
+  setMessage("#legal-acceptance-message", "Se înregistrează acceptarea…");
+  try {
+    await requestJSON("/api/legal/accept", "POST", { acceptedLegal: true });
+    const user = state.pendingLegalUser;
+    state.pendingLegalUser = null;
+    event.currentTarget.reset();
+    if (user) enterApp(user);
+    else await start();
+  } catch (error) {
+    setMessage("#legal-acceptance-message", error.message, "error");
+  } finally {
+    button.disabled = false;
+  }
+});
+
 async function start() {
   await checkHealth();
   let status = {};
@@ -346,6 +377,11 @@ async function start() {
     return;
   }
   if (session.authenticated && session.user) {
+    if (session.legalAcceptanceRequired) {
+      state.pendingLegalUser = session.user;
+      showOnly("legal");
+      return;
+    }
     enterApp(session.user);
     return;
   }
