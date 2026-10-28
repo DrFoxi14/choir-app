@@ -131,6 +131,13 @@ function enterApp(user) {
   $("#user-summary").textContent = user.displayName + " · " + (roleNames[user.role] || user.role);
   $("#user-summary").classList.remove("hidden");
   $("#logout-button").classList.remove("hidden");
+  $("#account-settings-toggle").classList.remove("hidden");
+  $("#account-phone").value = user.phoneNumber || "";
+  $("#account-current-phone").textContent = user.phoneNumber
+    ? "Număr de telefon salvat: " + user.phoneNumber
+    : "Număr de telefon: încă nesetat";
+  $("#account-phone-pin").value = "";
+  $("#phone-message").textContent = "";
   if (user.role === "owner" || user.role === "conductor") {
     showOnly("conductor");
     $("#conductor-role-badge").textContent = roleNames[user.role];
@@ -152,6 +159,9 @@ function leaveApp() {
   state.user = null;
   $("#user-summary").classList.add("hidden");
   $("#logout-button").classList.add("hidden");
+  $("#account-settings-toggle").classList.add("hidden");
+  $("#account-settings-toggle").setAttribute("aria-expanded", "false");
+  $("#account-settings").classList.add("hidden");
   hideIssuedCode();
   showOnly("auth");
 }
@@ -379,6 +389,39 @@ $("#reset-form").addEventListener("submit", async (event) => {
     button.disabled = false;
   }
 });
+$("#account-settings-toggle").addEventListener("click", () => {
+  const panel = $("#account-settings");
+  const opening = panel.classList.contains("hidden");
+  panel.classList.toggle("hidden", !opening);
+  $("#account-settings-toggle").setAttribute("aria-expanded", opening ? "true" : "false");
+  if (opening) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+$("#account-settings-close").addEventListener("click", () => {
+  $("#account-settings").classList.add("hidden");
+  $("#account-settings-toggle").setAttribute("aria-expanded", "false");
+});
+$("#phone-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const button = event.currentTarget.querySelector("button[type=submit]");
+  button.disabled = true;
+  setMessage("#phone-message", "Se salvează numărul…");
+  try {
+    const data = await requestJSON("/api/account/phone", "POST", {
+      phone: $("#account-phone").value,
+      pin: $("#account-phone-pin").value
+    });
+    state.user.phoneNumber = data.phoneNumber;
+    $("#account-phone").value = data.phoneNumber;
+    $("#account-phone-pin").value = "";
+    $("#account-current-phone").textContent = "Număr de telefon salvat: " + data.phoneNumber;
+    setMessage("#phone-message", data.message || "Numărul a fost salvat.", "success");
+  } catch (error) {
+    setMessage("#phone-message", error.message, "error");
+  } finally {
+    button.disabled = false;
+  }
+});
+
 $("#logout-button").addEventListener("click", async () => {
   try { await requestJSON("/api/auth/logout", "POST", {}); } catch { /* Always return to sign-in. */ }
   leaveApp();

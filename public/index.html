@@ -19,11 +19,30 @@
       </div>
       <div class="header-actions">
         <span id="user-summary" class="user-summary hidden"></span>
+        <button id="account-settings-toggle" class="text-button hidden" type="button" aria-expanded="false" aria-controls="account-settings">Contul meu</button>
         <button id="logout-button" class="text-button hidden" type="button">Deconectare</button>
       </div>
     </header>
 
     <p id="configuration-notice" class="notice hidden" role="status"></p>
+
+    <section id="account-settings" class="panel dashboard-section account-settings hidden" aria-labelledby="account-settings-title">
+      <div class="section-heading">
+        <h2 id="account-settings-title">Contul meu</h2>
+        <button id="account-settings-close" class="secondary-button" type="button">Închide</button>
+      </div>
+      <p id="account-current-phone" class="muted compact">Număr de telefon: încă nesetat</p>
+      <p class="muted compact">Folosește numărul tău personal. Pentru protecție, confirmă modificarea cu PIN-ul actual.</p>
+      <form id="phone-form" class="form-stack">
+        <label for="account-phone">Număr de telefon</label>
+        <input id="account-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="0754 322 323" required>
+        <label for="account-phone-pin">PIN-ul actual</label>
+        <input id="account-phone-pin" name="pin" type="password" inputmode="numeric" pattern="[0-9]{6}" minlength="6" maxlength="6" autocomplete="current-password" required>
+        <button class="primary-button" type="submit">Salvează numărul</button>
+        <p id="phone-message" class="form-message" role="status"></p>
+      </form>
+      <p class="muted compact">Numărul nu este verificat prin SMS în această versiune. Păstrează-l corect ca să te poți conecta cu el.</p>
+    </section>
 
     <section id="setup-screen" class="panel auth-panel hidden" aria-labelledby="setup-title">
       <p class="eyebrow">CONFIGURARE INIȚIALĂ</p>
