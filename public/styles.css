@@ -7,6 +7,8 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   --navy: #172554;
+  --accent: #5B9BD5;
+  --accent-ink: #172033;
   --muted: #667085;
   --line: #e4e8f0;
   --surface: #fff;
@@ -19,7 +21,7 @@ button, select { cursor: pointer; }
 button:disabled { cursor: wait; opacity: .65; }
 .shell { width: min(100% - 32px, 820px); margin: 0 auto; padding: 28px 0 24px; min-height: 100svh; display: flex; flex-direction: column; }
 .topbar { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
-.brand-mark { display: grid; place-items: center; flex: 0 0 48px; width: 48px; height: 48px; border-radius: 15px; background: var(--navy); color: white; font-size: 28px; }
+.brand-mark { display: grid; place-items: center; flex: 0 0 48px; width: 48px; height: 48px; border-radius: 15px; background: var(--accent); color: var(--accent-ink); font-size: 28px; }
 .brand-copy { min-width: 0; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { font-size: 1.25rem; margin-bottom: 0; }
@@ -53,8 +55,8 @@ input:focus-visible, select:focus-visible, button:focus-visible, summary:focus-v
   font-weight: 700;
   border: 1px solid transparent;
 }
-.primary-button { color: white; background: var(--navy); }
-.primary-button:hover { background: #26376f; }
+.primary-button { color: var(--accent-ink); background: var(--accent); }
+.primary-button:hover { background: var(--accent); filter: brightness(.95); }
 .secondary-button { color: var(--navy); background: #f8f9ff; border-color: var(--line); }
 .secondary-button:hover { background: #eef1ff; }
 .danger-button { color: var(--danger); }
@@ -222,14 +224,15 @@ footer p { margin-bottom: 5px; }
 }
 
 
-/* Account-level accent palette */
-html[data-accent-theme="violet"] { --navy: #6d28d9; }
-html[data-accent-theme="emerald"] { --navy: #047857; }
-html[data-accent-theme="rose"] { --navy: #be123c; }
-html[data-accent-theme="amber"] { --navy: #b45309; }
-html[data-accent-theme="teal"] { --navy: #0f766e; }
-html[data-accent-theme="slate"] { --navy: #334155; }
-html[data-accent-theme="berry"] { --navy: #9d174d; }
+/* Bright accent palettes paired with dark, legible text colors */
+html[data-accent-theme="ocean"] { --accent: #5B9BD5; --navy: #28577F; --accent-ink: #172033; }
+html[data-accent-theme="violet"] { --accent: #9B8AFB; --navy: #4C3D90; --accent-ink: #172033; }
+html[data-accent-theme="emerald"] { --accent: #7DBB91; --navy: #285C3D; --accent-ink: #172033; }
+html[data-accent-theme="rose"] { --accent: #DE7356; --navy: #8C3A2A; --accent-ink: #172033; }
+html[data-accent-theme="amber"] { --accent: #F3B760; --navy: #755014; --accent-ink: #172033; }
+html[data-accent-theme="teal"] { --accent: #56B9B0; --navy: #1A5D59; --accent-ink: #172033; }
+html[data-accent-theme="slate"] { --accent: #A7B5C7; --navy: #3F5266; --accent-ink: #172033; }
+html[data-accent-theme="berry"] { --accent: #D778A5; --navy: #853456; --accent-ink: #172033; }
 
 .preferences-form { margin-top: 12px; }
 .theme-picker {
@@ -265,14 +268,14 @@ html[data-accent-theme="berry"] { --navy: #9d174d; }
   accent-color: var(--navy);
 }
 .theme-swatch { flex: 0 0 19px; width: 19px; height: 19px; border-radius: 50%; border: 1px solid rgb(0 0 0 / 12%); }
-.swatch-ocean { background: #172554; }
-.swatch-violet { background: #6d28d9; }
-.swatch-emerald { background: #047857; }
-.swatch-rose { background: #be123c; }
-.swatch-amber { background: #b45309; }
-.swatch-teal { background: #0f766e; }
-.swatch-slate { background: #334155; }
-.swatch-berry { background: #9d174d; }
+.swatch-ocean { background: #5B9BD5; }
+.swatch-violet { background: #9B8AFB; }
+.swatch-emerald { background: #7DBB91; }
+.swatch-rose { background: #DE7356; }
+.swatch-amber { background: #F3B760; }
+.swatch-teal { background: #56B9B0; }
+.swatch-slate { background: #A7B5C7; }
+.swatch-berry { background: #D778A5; }
 .section-divider { width: 100%; border: 0; border-top: 1px solid var(--line); margin: 23px 0; }
 
 .attendance-section { margin-top: 18px; }
@@ -308,3 +311,28 @@ html[data-accent-theme="berry"] { --navy: #9d174d; }
   .attendance-row { grid-template-columns: minmax(0, 1fr); }
   .attendance-date-range { grid-template-columns: minmax(0, 1fr); }
 }
+
+
+/* Dedicated account and attendance pages */
+.text-button { text-decoration: none; display: inline-flex; align-items: center; }
+.account-page-content { display: grid; gap: 16px; }
+.account-card h2 { margin-bottom: 8px; }
+.account-card .muted:last-child { margin-bottom: 0; }
+.theme-option code { margin-left: auto; color: #6A5149; font-size: .76rem; background: #FFF1EC; padding: 3px 5px; border-radius: 5px; }
+.phone-change-toggle { margin-top: 3px; }
+.account-phone-value { font-weight: 650; margin-bottom: 12px; overflow-wrap: anywhere; }
+.phone-change-panel { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.phone-change-panel[hidden] { display: none !important; }
+.phone-change-panel .form-stack { margin-top: 12px; }
+.conductor-quick-links { margin-top: 18px; }
+.conductor-tool-links { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.conductor-tool-links a { text-decoration: none; text-align: center; display: inline-flex; align-items: center; justify-content: center; }
+.attendance-page-content { display: grid; gap: 12px; }
+.attendance-page-content h2, .attendance-page-content h3 { margin-bottom: 4px; }
+.attendance-page-content > .form-stack { margin-top: 8px; }
+.attendance-roster-heading h3 { margin: 0; }
+.attendance-row { background: var(--surface); }
+.theme-option:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 10%, white); }
+.theme-option input[type="radio"] { accent-color: var(--accent); }
+
+.account-page-content[hidden], .attendance-page-content[hidden] { display: none !important; }
