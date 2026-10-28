@@ -39,7 +39,8 @@ def main() -> None:
     assert "recordAudit(" in verification
 
     # The route serves a dedicated asset, while data remains API-protected.
-    assert 'url.pathname === "/invitation"' in WORKER
+    assert '"/invitation": "invitation.html"' in WORKER
+    assert '"/invitation/": "invitation.html"' in WORKER
     assert 'path === "/api/conductor/contacts"' in WORKER
     assert "phoneVerificationMatch" in WORKER
 
