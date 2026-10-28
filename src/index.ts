@@ -50,6 +50,21 @@ const AUTH_WINDOW_SECONDS = 900;
 const PIN_ITERATIONS = 100000;
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 const VOICE_PARTS = ["S", "A", "T", "B"] as const;
+const ACCENT_THEMES = ["ocean", "violet", "emerald", "rose", "amber", "teal", "slate", "berry"] as const;
+const ATTENDANCE_STATUSES = ["present", "absent", "excused", "late"] as const;
+type AccentTheme = typeof ACCENT_THEMES[number];
+type AttendanceStatus = typeof ATTENDANCE_STATUSES[number];
+function isAccentTheme(value: unknown): value is AccentTheme {
+  return typeof value === "string" && (ACCENT_THEMES as readonly string[]).includes(value);
+}
+function isAttendanceStatus(value: unknown): value is AttendanceStatus {
+  return typeof value === "string" && (ATTENDANCE_STATUSES as readonly string[]).includes(value);
+}
+function isIsoDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\\d{4}-\\d{2}-\\d{2}$/.test(value)) return false;
+  const parsed = new Date(value + "T00:00:00.000Z");
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
 
 function json(data: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
   const headers = new Headers({
@@ -871,12 +886,142 @@ async function listMembers(request: Request, env: Env): Promise<Response> {
   if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot vedea lista membrilor.", 403);
   if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
   const result = await env.DB.prepare(
-    "SELECT u.id, u.display_name AS displayName, m.role, m.voice_part AS voicePart, m.created_at AS joinedAt " +
+    "SELECT u.id, m.id AS membershipId, u.display_name AS displayName, m.role, m.voice_part AS voicePart, m.created_at AS joinedAt " +
     "FROM choir_memberships m JOIN users u ON u.id = m.user_id " +
     "WHERE m.choir_id = ? AND m.status = 'active' AND u.status = 'active' " +
     "ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'conductor' THEN 1 ELSE 2 END, u.display_name COLLATE NOCASE"
   ).bind(current.choirId).all();
   return json({ members: result.results ?? [], actorRole: current.role });
+}
+async function getAccountPreferences(request: Request, env: Env): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const result = await env.DB.prepare(
+    "SELECT accent_theme AS accentTheme FROM user_preferences WHERE user_id = ? LIMIT 1"
+  ).bind(current.userId).all<{ accentTheme: AccentTheme }>();
+  return json({ accentTheme: result.results?.[0]?.accentTheme ?? "ocean" });
+}
+async function saveAccountPreferences(request: Request, env: Env): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const body = await readJson(request);
+  if (!body || !isAccentTheme(body.accentTheme)) {
+    return fail("invalid_accent_theme", "Alege o culoare din paleta disponibilă.", 400);
+  }
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    "INSERT INTO user_preferences (user_id, accent_theme, updated_at) VALUES (?, ?, ?) " +
+    "ON CONFLICT(user_id) DO UPDATE SET accent_theme = excluded.accent_theme, updated_at = excluded.updated_at"
+  ).bind(current.userId, body.accentTheme, now).run();
+  await recordAudit(env, current.choirId, current.userId, "account.preferences.updated", "user", current.userId, {
+    accentTheme: body.accentTheme
+  });
+  return json({ accentTheme: body.accentTheme, message: "Paleta de culori a fost salvată." });
+}
+async function saveAttendance(request: Request, env: Env): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot înregistra prezența.", 403);
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const body = await readJson(request);
+  if (!body || !isIsoDate(body.date)) {
+    return fail("invalid_attendance_date", "Alege o dată validă pentru repetiție.", 400);
+  }
+  if (typeof body.title !== "string") {
+    return fail("invalid_attendance_title", "Completează denumirea repetiției.", 400);
+  }
+  const title = body.title.trim().replace(/[\\u0000-\\u001f\\u007f]/g, "").replace(/\\s+/g, " ");
+  if (!title || title.length > 80) {
+    return fail("invalid_attendance_title", "Denumirea trebuie să aibă între 1 și 80 de caractere.", 400);
+  }
+  if (!Array.isArray(body.records) || body.records.length < 1 || body.records.length > 300) {
+    return fail("invalid_attendance_records", "Lista de prezență este goală sau prea mare.", 400);
+  }
+  const supplied = new Map<string, AttendanceStatus>();
+  for (const item of body.records) {
+    if (!item || typeof item !== "object") {
+      return fail("invalid_attendance_records", "Lista de prezență nu este validă.", 400);
+    }
+    const record = item as Record<string, unknown>;
+    if (typeof record.membershipId !== "string" || !/^[a-f0-9-]{36}$/i.test(record.membershipId) ||
+        !isAttendanceStatus(record.status) || supplied.has(record.membershipId)) {
+      return fail("invalid_attendance_records", "Verifică numele și statusurile din lista de prezență.", 400);
+    }
+    supplied.set(record.membershipId, record.status);
+  }
+  const rosterResult = await env.DB.prepare(
+    "SELECT id FROM choir_memberships WHERE choir_id = ? AND status = 'active'"
+  ).bind(current.choirId).all<{ id: string }>();
+  const rosterIds = (rosterResult.results ?? []).map((row) => row.id);
+  if (rosterIds.length === 0 || rosterIds.length !== supplied.size ||
+      rosterIds.some((id) => !supplied.has(id))) {
+    return fail("attendance_roster_changed", "Lista membrilor s-a schimbat. Reîncarcă lista și încearcă din nou.", 409);
+  }
+
+  const proposedId = crypto.randomUUID();
+  await env.DB.prepare(
+    "INSERT INTO attendance_sessions (id, choir_id, session_date, title, created_by_user_id) " +
+    "VALUES (?, ?, ?, ?, ?) ON CONFLICT(choir_id, session_date, title) DO NOTHING"
+  ).bind(proposedId, current.choirId, body.date, title, current.userId).run();
+  const sessionResult = await env.DB.prepare(
+    "SELECT id FROM attendance_sessions WHERE choir_id = ? AND session_date = ? AND title = ? LIMIT 1"
+  ).bind(current.choirId, body.date, title).all<{ id: string }>();
+  const sessionId = sessionResult.results?.[0]?.id;
+  if (!sessionId) throw new Error("Attendance session was not persisted");
+  const now = new Date().toISOString();
+  const statements = Array.from(supplied.entries(), ([membershipId, status]) => env.DB!.prepare(
+    "INSERT INTO attendance_records (id, session_id, membership_id, status, recorded_by_user_id, updated_at) " +
+    "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT(session_id, membership_id) DO UPDATE SET " +
+    "status = excluded.status, recorded_by_user_id = excluded.recorded_by_user_id, updated_at = excluded.updated_at"
+  ).bind(crypto.randomUUID(), sessionId, membershipId, status, current.userId, now));
+  await env.DB.batch(statements);
+  await recordAudit(env, current.choirId, current.userId, "conductor.attendance.saved", "attendance_session", sessionId, {
+    sessionDate: body.date, title, memberCount: supplied.size
+  });
+  return json({ sessionId, date: body.date, title, memberCount: supplied.size, message: "Prezența a fost salvată." });
+}
+async function getAttendanceReport(request: Request, env: Env): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot consulta prezența.", 403);
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const url = new URL(request.url);
+  const today = new Date().toISOString().slice(0, 10);
+  const defaultFrom = today.slice(0, 7) + "-01";
+  const from = url.searchParams.get("from") ?? defaultFrom;
+  const to = url.searchParams.get("to") ?? today;
+  if (!isIsoDate(from) || !isIsoDate(to) || from > to) {
+    return fail("invalid_attendance_range", "Alege un interval de date valid.", 400);
+  }
+  const span = (Date.parse(to + "T00:00:00Z") - Date.parse(from + "T00:00:00Z")) / 86400000;
+  if (span > 366) return fail("attendance_range_too_large", "Exportul poate cuprinde cel mult 367 de zile.", 400);
+  const [sessionsResult, membersResult, recordsResult] = await Promise.all([
+    env.DB.prepare(
+      "SELECT id, session_date AS date, title FROM attendance_sessions " +
+      "WHERE choir_id = ? AND session_date BETWEEN ? AND ? " +
+      "ORDER BY session_date ASC, title COLLATE NOCASE ASC"
+    ).bind(current.choirId, from, to).all<{ id: string; date: string; title: string }>(),
+    env.DB.prepare(
+      "SELECT m.id AS membershipId, u.display_name AS displayName, m.role, m.voice_part AS voicePart " +
+      "FROM choir_memberships m JOIN users u ON u.id = m.user_id " +
+      "WHERE m.choir_id = ? AND m.status != 'invited' AND u.status = 'active' " +
+      "ORDER BY u.display_name COLLATE NOCASE"
+    ).bind(current.choirId).all<{ membershipId: string; displayName: string; role: Role; voicePart: VoicePart | null }>(),
+    env.DB.prepare(
+      "SELECT ar.session_id AS sessionId, ar.membership_id AS membershipId, ar.status " +
+      "FROM attendance_records ar JOIN attendance_sessions s ON s.id = ar.session_id " +
+      "WHERE s.choir_id = ? AND s.session_date BETWEEN ? AND ?"
+    ).bind(current.choirId, from, to).all<{ sessionId: string; membershipId: string; status: AttendanceStatus }>()
+  ]);
+  const sessions = sessionsResult.results ?? [];
+  const members = membersResult.results ?? [];
+  const records = recordsResult.results ?? [];
+  await recordAudit(env, current.choirId, current.userId, "conductor.attendance.report_viewed", "choir", current.choirId, {
+    from, to, sessionCount: sessions.length
+  });
+  return json({ from, to, sessions, members, records });
 }
 async function listInvitations(request: Request, env: Env): Promise<Response> {
   const current = await requireSession(request, env);
@@ -1099,6 +1244,8 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
       }
     } : { authenticated: false, authenticationConfigured: true });
   }
+  if (request.method === "GET" && path === "/api/account/preferences") return getAccountPreferences(request, env);
+  if (request.method === "GET" && path === "/api/conductor/attendance") return getAttendanceReport(request, env);
   if (request.method !== "GET" && request.method !== "POST") {
     return fail("method_not_allowed", "Metoda nu este permisă.", 405);
   }
@@ -1112,6 +1259,8 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === "POST" && path === "/api/auth/logout") return logout(request, env);
   if (request.method === "POST" && path === "/api/auth/reset-access") return resetAccess(request, env);
   if (request.method === "POST" && path === "/api/account/phone") return updateAccountPhone(request, env);
+  if (request.method === "POST" && path === "/api/account/preferences") return saveAccountPreferences(request, env);
+  if (request.method === "POST" && path === "/api/conductor/attendance") return saveAttendance(request, env);
   if (request.method === "GET" && path === "/api/songs") return listSongs(request, env);
   if (request.method === "GET" && path === "/api/conductor/members") return listMembers(request, env);
   if (request.method === "POST" && path === "/api/conductor/contacts") return listMemberContacts(request, env);
