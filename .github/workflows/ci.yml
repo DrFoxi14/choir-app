@@ -35,6 +35,8 @@ jobs:
         run: |
           node --check public/app.js
           node --check public/invitation.js
+          node --check public/account.js
+          node --check public/attendance.js
 
       - name: Smoke-test D1 migrations
         run: python3 tests/schema_smoke.py
@@ -44,6 +46,9 @@ jobs:
 
       - name: Smoke-test protected invitation contacts
         run: python3 tests/invitation_contact_security_smoke.py
+
+      - name: Smoke-test account and attendance routes
+        run: python3 tests/account_attendance_routes_smoke.py
 
       - name: Smoke-test one-paste Preview D1 bootstrap
         run: python3 tests/preview_d1_bootstrap_smoke.py
