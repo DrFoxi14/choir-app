@@ -144,3 +144,23 @@ footer p { margin-bottom: 5px; }
 }
 
 .invitation-section-spaced { margin-top: 16px; }
+
+
+/* Conductor contact verification badges and controls */
+.contact-title-line { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.verified-badge {
+  display: inline-flex; align-items: center; gap: 5px; border-radius: 999px;
+  background: #e7f0ff; color: #1558c0; padding: 5px 9px; font-size: .76rem; font-weight: 750;
+}
+.verified-check {
+  display: inline-grid; place-items: center; width: 17px; height: 17px; border-radius: 50%;
+  color: #fff; background: #1877f2; font-size: .72rem; line-height: 1;
+}
+.unverified-badge {
+  display: inline-flex; align-items: center; border-radius: 999px;
+  background: #fff4d6; color: #805b00; padding: 5px 9px; font-size: .76rem; font-weight: 700;
+}
+.verification-form { width: 100%; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: #fafbff; }
+.verification-form input { max-width: 260px; }
+.verification-form .contact-actions { margin-top: 4px; }
+.contact-warning { margin: 8px 0 0; font-size: .85rem; line-height: 1.45; color: #7a5b15; }
