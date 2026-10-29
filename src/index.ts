@@ -879,11 +879,16 @@ function toHex(bytes: Uint8Array): string {
   return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 async function hmacBytes(keyMaterial: string | Uint8Array, value: string): Promise<Uint8Array> {
-  const rawKey = typeof keyMaterial === "string" ? encoder.encode(keyMaterial) : keyMaterial;
+  const keyBytes = typeof keyMaterial === "string" ? encoder.encode(keyMaterial) : keyMaterial;
+  const keyBuffer = new ArrayBuffer(keyBytes.byteLength);
+  new Uint8Array(keyBuffer).set(keyBytes);
   const key = await crypto.subtle.importKey(
-    "raw", rawKey, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+    "raw", keyBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
   );
-  const digest = await crypto.subtle.sign("HMAC", key, encoder.encode(value));
+  const valueBytes = encoder.encode(value);
+  const valueBuffer = new ArrayBuffer(valueBytes.byteLength);
+  new Uint8Array(valueBuffer).set(valueBytes);
+  const digest = await crypto.subtle.sign("HMAC", key, valueBuffer);
   return new Uint8Array(digest);
 }
 async function sha256Hex(value: string): Promise<string> {
