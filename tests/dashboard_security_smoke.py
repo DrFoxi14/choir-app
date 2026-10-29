@@ -43,7 +43,7 @@ assert "DELETE FROM audit_logs" not in worker
 assert "audit_logs_block_update" in migration
 assert "audit_logs_block_delete" in migration
 assert "RAISE(ABORT, 'audit_logs are immutable')" in migration
-assert "read-only" in dashboard_html.lower()
+assert "numai pentru citire" in dashboard_html.lower()
 assert "audit-delete" not in dashboard_html + dashboard_js
 assert 'method: "DELETE"' not in dashboard_js
 
