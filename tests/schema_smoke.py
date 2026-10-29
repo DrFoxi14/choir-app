@@ -10,6 +10,7 @@ db.executescript((root / "migrations" / "0001_initial_schema.sql").read_text())
 db.executescript((root / "migrations" / "0002_member_auth_and_conductors.sql").read_text())
 db.executescript((root / "migrations" / "0003_member_phone_verification.sql").read_text())
 db.executescript((root / "migrations" / "0004_preferences_attendance.sql").read_text())
+db.executescript((root / "migrations" / "0005_backblaze_media.sql").read_text())
 
 columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
 for required in {"login_code_hash", "pin_salt", "pin_hash"}:
@@ -18,8 +19,16 @@ for required in {"login_code_hash", "pin_salt", "pin_hash"}:
 tables = {row[0] for row in db.execute(
     "SELECT name FROM sqlite_master WHERE type='table'"
 )}
-for required in {"auth_rate_limits", "access_reset_codes", "sessions", "choir_memberships", "user_preferences", "attendance_sessions", "attendance_records"}:
+for required in {"auth_rate_limits", "access_reset_codes", "sessions", "choir_memberships", "user_preferences", "attendance_sessions", "attendance_records", "media_uploads"}:
     assert required in tables, f"Missing table: {required}"
+
+
+# Backblaze upload reservations must be scoped to an existing choir song and creator.
+media_columns = {row[1] for row in db.execute("PRAGMA table_info(media_uploads)")}
+for required in {"id", "choir_id", "song_id", "created_by_user_id", "object_key", "voice_part", "format", "file_name", "content_type", "size_bytes", "status", "expires_at"}:
+    assert required in media_columns, f"Missing media_uploads column: {required}"
+asset_columns = {row[1] for row in db.execute("PRAGMA table_info(song_assets)")}
+assert "file_name" in asset_columns, "Uploaded file labels must be stored separately from storage keys"
 
 tabor = db.execute("SELECT name, slug, status FROM choirs WHERE id='choir_tabor'").fetchone()
 assert tabor == ("Corul Tabor", "tabor", "active"), f"Unexpected seeded choir: {tabor}"
