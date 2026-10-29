@@ -915,7 +915,7 @@ async function presignB2Object(
     ["X-Amz-SignedHeaders", signedHeaders]
   ];
   const canonicalQuery = queryValues
-    .sort(([a], [b]) => a.localeCompare(b))
+    .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
     .map(([key, value]) => awsEncode(key) + "=" + awsEncode(value))
     .join("&");
   const canonicalRequest = [
@@ -1684,11 +1684,11 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === "POST" && path === "/api/conductor/songs") return createSong(request, env);
   if (request.method === "POST" && path === "/api/conductor/assets/complete") return completeMediaUpload(request, env);
   if (request.method === "GET" && path === "/api/songs") return listSongs(request, env);
-  const songPublishMatch = path.match(/^\\/api\\/conductor\\/songs\\/([a-f0-9-]{36})\\/publish$/);
+  const songPublishMatch = path.match(/^\/api\/conductor\/songs\/([a-f0-9-]{36})\/publish$/);
   if (request.method === "POST" && songPublishMatch) return publishSong(request, env, songPublishMatch[1]);
-  const songUploadMatch = path.match(/^\\/api\\/conductor\\/songs\\/([a-f0-9-]{36})\\/assets\\/upload-url$/);
+  const songUploadMatch = path.match(/^\/api\/conductor\/songs\/([a-f0-9-]{36})\/assets\/upload-url$/);
   if (request.method === "POST" && songUploadMatch) return prepareMediaUpload(request, env, songUploadMatch[1]);
-  const assetDownloadMatch = path.match(/^\\/api\\/assets\\/([a-f0-9-]{36})\\/download$/);
+  const assetDownloadMatch = path.match(/^\/api\/assets\/([a-f0-9-]{36})\/download$/);
   if (request.method === "GET" && assetDownloadMatch) return downloadSongAsset(request, env, assetDownloadMatch[1]);
   if (request.method === "GET" && path === "/api/conductor/members") return listMembers(request, env);
   if (request.method === "POST" && path === "/api/conductor/contacts") return listMemberContacts(request, env);
