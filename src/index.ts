@@ -1418,7 +1418,7 @@ async function downloadSongAsset(request: Request, env: Env, assetId: string): P
   const baseName = requestedName || (fallbackName + (asset.format === "pdf" ? ".pdf" : asset.format === "audio" ? ".audio" : ".video"));
   // ASCII fallback plus RFC 5987 UTF-8 form; escape quotes and control chars first.
   const safeAsciiName = baseName.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-zA-Z0-9._ -]/g, "_").replace(/["\\\\]/g, "_").slice(0, 180) || "fisier";
+    .replace(/[^a-zA-Z0-9._ -]/g, "_").replace(/["\\]/g, "_").slice(0, 180) || "fisier";
   const utf8Name = encodeURIComponent(baseName).replace(/['()*]/g, (char) =>
     "%" + char.charCodeAt(0).toString(16).toUpperCase()
   );
