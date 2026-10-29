@@ -54,7 +54,7 @@ assert "asset.status" not in catalog
 # All upload and download routes require an authenticated session plus conductor/member policy checks.
 for route in [
     '"/api/conductor/media/status"',
-assert '"/api/conductor/media/diagnose"' in dashboard_js
+    '"/api/conductor/media/diagnose"',
     '"/api/conductor/songs"',
     '"/api/conductor/assets/complete"',
 ]:
