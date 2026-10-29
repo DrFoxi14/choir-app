@@ -8,6 +8,9 @@ enabled = true
 
 [vars]
 DEFAULT_CHOIR_SLUG = "tabor"
+B2_ENDPOINT = "https://s3.us-east-005.backblazeb2.com"
+B2_REGION = "us-east-005"
+B2_BUCKET = "choir-tabor-media-1"
 
 [assets]
 directory = "./public"
