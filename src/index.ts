@@ -1028,6 +1028,88 @@ async function getMediaStorageStatus(request: Request, env: Env): Promise<Respon
   if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot consulta starea stocării.", 403);
   return json({ configured: Boolean(getB2Config(env)) });
 }
+async function diagnoseMediaStorage(request: Request, env: Env): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot testa conexiunea la stocare.", 403);
+  const config = getB2Config(env);
+  if (!config) return fail("backblaze_not_configured", "Lipsește una sau mai multe variabile B2 din Production.", 503);
+
+  const objectKey = current.choirId + "/_diagnostics/" + crypto.randomUUID() + ".pdf";
+  const signatureUrl = await presignB2Object(config, "GET", objectKey, 60);
+  let signatureStatus = 0;
+  let signatureCode = "";
+  try {
+    const response = await fetch(signatureUrl, { method: "GET" });
+    signatureStatus = response.status;
+    const body = (await response.text()).slice(0, 3000);
+    signatureCode = body.match(/<Code>([^<]+)<\/Code>/i)?.[1] ?? "";
+    if (response.status === 404 && !signatureCode) signatureCode = "NoSuchKey";
+  } catch {
+    signatureCode = "NetworkError";
+  }
+  const signaturePass = signatureStatus === 404 &&
+    (signatureCode === "" || signatureCode === "NoSuchKey" || signatureCode === "NotFound");
+
+  const origin = new URL(request.url).origin;
+  const putUrl = await presignB2Object(config, "PUT", objectKey, 60, "application/pdf");
+  let preflightStatus = 0;
+  let allowOrigin = "";
+  let allowMethods = "";
+  let allowHeaders = "";
+  let preflightCode = "";
+  try {
+    const response = await fetch(putUrl, {
+      method: "OPTIONS",
+      headers: {
+        "Origin": origin,
+        "Access-Control-Request-Method": "PUT",
+        "Access-Control-Request-Headers": "content-type"
+      }
+    });
+    preflightStatus = response.status;
+    allowOrigin = response.headers.get("Access-Control-Allow-Origin") ?? "";
+    allowMethods = response.headers.get("Access-Control-Allow-Methods") ?? "";
+    allowHeaders = response.headers.get("Access-Control-Allow-Headers") ?? "";
+    const body = (await response.text()).slice(0, 3000);
+    preflightCode = body.match(/<Code>([^<]+)<\/Code>/i)?.[1] ?? "";
+  } catch {
+    preflightCode = "NetworkError";
+  }
+  const methods = allowMethods.toUpperCase().split(",").map((value) => value.trim());
+  const headers = allowHeaders.toLowerCase().split(",").map((value) => value.trim());
+  const corsPass = (preflightStatus >= 200 && preflightStatus < 300) &&
+    allowOrigin === origin &&
+    methods.includes("PUT") &&
+    (headers.includes("*") || headers.includes("content-type"));
+
+  await recordAudit(env, current.choirId, current.userId, "conductor.media.connection_diagnosed", "media_storage", null, {
+    signatureStatus, signatureCode: signatureCode || null, preflightStatus, preflightCode: preflightCode || null,
+    corsPass
+  });
+  return json({
+    configured: true,
+    signature: {
+      ok: signaturePass,
+      status: signatureStatus,
+      code: signatureCode || null,
+      message: signaturePass
+        ? "Semnătura și accesul de citire sunt acceptate de Backblaze."
+        : "Backblaze nu a confirmat semnătura sau permisiunile. Verifică cheia și prefixul de acces."
+    },
+    cors: {
+      ok: corsPass,
+      status: preflightStatus,
+      allowOrigin: allowOrigin || null,
+      allowMethods: allowMethods || null,
+      allowHeaders: allowHeaders || null,
+      code: preflightCode || null,
+      message: corsPass
+        ? "Preflight-ul CORS pentru PUT și content-type este acceptat."
+        : "Regula CORS nu a confirmat origine, metoda PUT și antetul content-type."
+    }
+  });
+}
 async function createSong(request: Request, env: Env): Promise<Response> {
   const current = await requireSession(request, env);
   if (current instanceof Response) return current;
@@ -1685,6 +1767,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === "POST" && path === "/api/account/preferences") return saveAccountPreferences(request, env);
   if (request.method === "POST" && path === "/api/conductor/attendance") return saveAttendance(request, env);
   if (request.method === "GET" && path === "/api/conductor/media/status") return getMediaStorageStatus(request, env);
+  if (request.method === "GET" && path === "/api/conductor/media/diagnose") return diagnoseMediaStorage(request, env);
   if (request.method === "GET" && path === "/api/conductor/songs") return listConductorSongs(request, env);
   if (request.method === "POST" && path === "/api/conductor/songs") return createSong(request, env);
   if (request.method === "POST" && path === "/api/conductor/assets/complete") return completeMediaUpload(request, env);
