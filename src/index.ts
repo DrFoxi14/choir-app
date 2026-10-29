@@ -1391,9 +1391,13 @@ async function downloadSongAsset(request: Request, env: Env, assetId: string): P
   if (!config) return fail("backblaze_not_configured", "Backblaze B2 nu este configurat încă pe server.", 503);
   const assetResult = await env.DB.prepare(
     "SELECT a.id, a.object_key AS objectKey, a.status AS assetStatus, a.voice_part AS voicePart, " +
-    "s.status AS songStatus FROM song_assets a JOIN songs s ON s.id = a.song_id AND s.choir_id = a.choir_id " +
+    "a.format AS format, a.file_name AS fileName, s.title AS songTitle, s.status AS songStatus " +
+    "FROM song_assets a JOIN songs s ON s.id = a.song_id AND s.choir_id = a.choir_id " +
     "WHERE a.id = ? AND a.choir_id = ? LIMIT 1"
-  ).bind(assetId, current.choirId).all<{ id: string; objectKey: string; assetStatus: string; voicePart: MediaVoice; songStatus: string }>();
+  ).bind(assetId, current.choirId).all<{
+    id: string; objectKey: string; assetStatus: string; voicePart: MediaVoice;
+    format: MediaFormat; fileName: string | null; songTitle: string; songStatus: string;
+  }>();
   const asset = assetResult.results?.[0];
   if (!asset || asset.assetStatus === "archived" || asset.songStatus === "archived") {
     return fail("asset_not_found", "Fișierul nu a fost găsit.", 404);
@@ -1402,14 +1406,35 @@ async function downloadSongAsset(request: Request, env: Env, assetId: string): P
       (asset.assetStatus !== "published" || asset.songStatus !== "published" || asset.voicePart !== current.voicePart)) {
     return fail("asset_not_found", "Fișierul nu este disponibil pentru contul tău.", 404);
   }
-  const signedUrl = await presignB2Object(config, "GET", asset.objectKey, 3600);
+
+  // Give the signed URL only enough lifetime for the member to start the transfer.
+  // It remains a bearer capability, so never include it in audit metadata or logs.
+  const signedUrl = await presignB2Object(config, "GET", asset.objectKey, 300);
+  const requestedName = safeUploadFileName(asset.fileName);
+  const fallbackName = (asset.songTitle || "cantare").normalize("NFKD")
+    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._ -]/g, "")
+    .trim().replace(/\\s+/g, "-").slice(0, 100) || "cantare";
+  const baseName = requestedName || (fallbackName + (asset.format === "pdf" ? ".pdf" : asset.format === "audio" ? ".audio" : ".video"));
+  // ASCII fallback plus RFC 5987 UTF-8 form; escape quotes and control chars first.
+  const safeAsciiName = baseName.normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[^a-zA-Z0-9._ -]/g, "_").replace(/["\\\\]/g, "_").slice(0, 180) || "fisier";
+  const utf8Name = encodeURIComponent(baseName).replace(/['()*]/g, (char) =>
+    "%" + char.charCodeAt(0).toString(16).toUpperCase()
+  );
+  await recordAudit(env, current.choirId, current.userId, "media.asset.download_link_issued", "song_asset", asset.id, {
+    format: asset.format,
+    voicePart: asset.voicePart,
+    role: current.role
+  });
   return new Response(null, {
     status: 302,
     headers: {
       "Location": signedUrl,
       "Cache-Control": "no-store, max-age=0",
       "Referrer-Policy": "no-referrer",
-      "X-Content-Type-Options": "nosniff"
+      "X-Content-Type-Options": "nosniff",
+      "Content-Disposition": "attachment; filename=\"" + safeAsciiName + "\"; filename*=UTF-8''" + utf8Name
     }
   });
 }
