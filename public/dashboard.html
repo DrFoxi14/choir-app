@@ -30,6 +30,17 @@
         <p class="muted">Jurnal cronologic al acțiunilor din Choir App. Fiecare eveniment este asociat contului care l-a inițiat, când identitatea este disponibilă.</p>
       </div>
 
+      <section class="panel dashboard-diagnostic-panel" aria-labelledby="media-diagnostic-title">
+        <div class="audit-heading-row">
+          <div>
+            <h3 id="media-diagnostic-title">Stocare media</h3>
+            <p class="muted compact">Verifică semnătura Backblaze B2 și setările CORS pentru încărcări.</p>
+          </div>
+          <button id="media-storage-diagnose" class="secondary-button" type="button">Testează conexiunea B2</button>
+        </div>
+        <p id="media-diagnose-message" class="form-message" role="status" aria-live="polite"></p>
+      </section>
+
       <div class="audit-summary-grid" aria-live="polite">
         <div class="audit-summary-card">
           <p>Înregistrări în jurnal</p>
