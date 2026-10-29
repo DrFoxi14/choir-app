@@ -81,7 +81,7 @@ assert 'id="media-diagnose-message"' not in home
 assert 'id="media-storage-diagnose"' in dashboard
 assert 'id="media-diagnose-message"' in dashboard
 assert '"/api/conductor/media/diagnose"' in dashboard_js
-assert '"/api/conductor/media/diagnose"' not in app
+assert '"/api/conductor/media/diagnose"' in dashboard_js
 assert '/api/conductor/media/diagnose' not in home
 assert 'method: "PUT"' in app
 assert '"/api/conductor/assets/complete"' in app
@@ -102,7 +102,8 @@ assert 'Access-Control-Allow-Origin' in worker
 assert 'Access-Control-Allow-Methods' in worker
 assert 'Access-Control-Allow-Headers' in worker
 assert '"/api/conductor/media/diagnose"' in app
-assert 'Testează conexiunea B2' in home
+assert 'Testează conexiunea B2' in dashboard
+assert 'Testează conexiunea B2' not in home
 assert 'Browserul nu a putut citi răspunsul Backblaze' in app
 
 print("Backblaze media smoke test passed: signed URLs, access checks, catalog privacy, and upload UI.")
