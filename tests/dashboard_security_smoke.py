@@ -15,6 +15,17 @@ worker_first_routes = assets_config.get("run_worker_first", [])
 # The UI labels both internal conductor roles simply as "Dirijor".
 assert 'const roleNames = { owner: "Dirijor", conductor: "Dirijor", member: "Membru" };' in main_js
 assert 'id="admin-dashboard-link"' in main_html
+assert 'id="toggle-media-library"' in main_html
+assert 'aria-controls="conductor-media-library"' in main_html
+assert 'id="conductor-media-library" class="panel dashboard-section conductor-media-library hidden"' in main_html
+assert "media-storage-diagnose" not in main_html, "B2 diagnostics should not clutter the main conductor page"
+assert 'id="media-storage-diagnose"' in dashboard_html
+assert 'id="media-diagnose-message"' in dashboard_html
+assert 'fetch("/api/conductor/media/diagnose"' in dashboard_js
+assert 'mediaLibraryToggle.textContent = isHidden ? "Adaugă cântare" : "Închide biblioteca"' in main_js
+assert 'deleteToggle.className = "danger-button danger-button-compact"' in main_js
+assert 'deleteToggle.textContent = "Șterge"' in main_js
+assert 'runBackblazeDiagnostic' not in main_js, "B2 diagnostics should be moved out of main page JavaScript"
 assert 'adminDashboardLink.classList.toggle("hidden", user.role !== "owner")' in main_js
 
 # Worker-first routing is required so static assets cannot intercept the protected dashboard path.
