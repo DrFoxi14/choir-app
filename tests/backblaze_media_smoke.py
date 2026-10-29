@@ -4,6 +4,8 @@ root = Path(__file__).resolve().parents[1]
 worker = (root / "src" / "index.ts").read_text()
 home = (root / "public" / "index.html").read_text()
 app = (root / "public" / "app.js").read_text()
+dashboard = (root / "public" / "dashboard.html").read_text()
+dashboard_js = (root / "public" / "dashboard.js").read_text()
 migration = (root / "migrations" / "0005_backblaze_media.sql").read_text()
 
 # The private bucket can only be accessed through server-issued short-lived SigV4 URLs.
@@ -69,10 +71,18 @@ for element in [
     'id="media-song-create-form"', 'id="media-upload-form"',
     'id="media-song-select"', 'id="media-voice-select"',
     'id="media-format-select"', 'id="media-file-input"',
-    'id="media-song-list"', 'id="media-storage-status"',
-    'id="media-storage-diagnose"', 'id="media-diagnose-message"'
+    'id="media-song-list"', 'id="media-storage-status"'
 ]:
     assert element in home, f"Missing media UI element {element}"
+
+# B2 diagnostics were moved out of the home screen and now live on the private dashboard.
+assert 'id="media-storage-diagnose"' not in home
+assert 'id="media-diagnose-message"' not in home
+assert 'id="media-storage-diagnose"' in dashboard
+assert 'id="media-diagnose-message"' in dashboard
+assert '"/api/conductor/media/diagnose"' not in app
+assert '"/api/conductor/media/diagnose"' in dashboard_js
+assert '/api/conductor/media/diagnose' not in home
 assert 'method: "PUT"' in app
 assert '"/api/conductor/assets/complete"' in app
 assert '"/api/conductor/songs/" + encodeURIComponent(song.id) + "/publish"' in app
@@ -91,8 +101,9 @@ assert 'corsMethodOnly' in worker and 'corsWithContentType' in worker
 assert 'Access-Control-Allow-Origin' in worker
 assert 'Access-Control-Allow-Methods' in worker
 assert 'Access-Control-Allow-Headers' in worker
-assert '"/api/conductor/media/diagnose"' in app
-assert 'Testează conexiunea B2' in home
+assert '"/api/conductor/media/diagnose"' in dashboard_js
+assert 'Testează conexiunea B2' in dashboard
+assert 'Testează conexiunea B2' not in home
 assert 'Browserul nu a putut citi răspunsul Backblaze' in app
 
 print("Backblaze media smoke test passed: signed URLs, access checks, catalog privacy, and upload UI.")

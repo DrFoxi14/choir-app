@@ -170,18 +170,15 @@
           <a id="admin-dashboard-link" class="secondary-button hidden" href="/dashboard">Dashboard</a>
           <a class="primary-button" href="/prezenta">Deschide prezența</a>
           <a class="secondary-button invitation-route-link" href="/invitation">Deschide invitații, contacte și membri</a>
+          <button id="toggle-media-library" class="primary-button" type="button" aria-expanded="false" aria-controls="conductor-media-library">Adaugă cântare</button>
         </div>
       </section>
 
-      <section class="panel dashboard-section conductor-media-library" aria-labelledby="conductor-media-title">
+      <section id="conductor-media-library" class="panel dashboard-section conductor-media-library hidden" aria-labelledby="conductor-media-title">
         <h3 id="conductor-media-title">Biblioteca de fișiere</h3>
         <p class="muted compact">Creează cântări, încarcă partituri PDF, audio și video în Backblaze B2, apoi publică materialele pentru membrii corului. Fișierele sunt încărcate direct din browser, iar cheia de stocare rămâne pe server.</p>
         <p id="media-storage-status" class="form-message" role="status">Se verifică stocarea…</p>
-        <div class="media-diagnostic-controls">
-          <button id="media-storage-diagnose" class="secondary-button" type="button">Testează conexiunea B2</button>
-          <p id="media-diagnose-message" class="form-message" role="status"></p>
-        </div>
-
+        
         <form id="media-song-create-form" class="form-stack media-song-create-form">
           <h4>Cântare nouă</h4>
           <label for="media-song-title">Titlu</label>

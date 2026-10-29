@@ -203,9 +203,9 @@ function renderConductorMediaSongs() {
       const adminActions = document.createElement("div");
       adminActions.className = "song-admin-actions";
       const deleteToggle = document.createElement("button");
-      deleteToggle.className = "danger-button";
+      deleteToggle.className = "danger-button danger-button-compact";
       deleteToggle.type = "button";
-      deleteToggle.textContent = "Șterge cântarea";
+      deleteToggle.textContent = "Șterge";
       const deleteForm = document.createElement("form");
       deleteForm.className = "song-delete-form hidden";
       addText(deleteForm, "p", "warning-text",
@@ -295,36 +295,6 @@ function renderConductorMediaSongs() {
     addText(container, "p", "muted compact", "Nu există încă nicio cântare. Creează una mai sus.");
   }
 }
-async function runBackblazeDiagnostic() {
-  const button = $("#media-storage-diagnose");
-  button.disabled = true;
-  setMessage("#media-diagnose-message", "Se testează semnătura și cele două variante CORS…");
-  try {
-    const result = await requestJSON("/api/conductor/media/diagnose");
-    const signature = result.signature || {};
-    const cors = result.cors || {};
-    const methodOnly = cors.methodOnly || {};
-    const withContentType = cors.withContentType || {};
-    const parts = [
-      "Semnătură: " + (signature.ok ? "OK" : "EȘEC") +
-        " (HTTP " + signature.status + (signature.code ? ", " + signature.code : "") + ").",
-      "CORS fără antet custom: " + (methodOnly.ok ? "OK" : "EȘEC") +
-        " (HTTP " + methodOnly.status + (methodOnly.code ? ", " + methodOnly.code : "") + ").",
-      "CORS cu content-type: " + (withContentType.ok ? "OK" : "EȘEC") +
-        " (HTTP " + withContentType.status + (withContentType.code ? ", " + withContentType.code : "") + ").",
-      methodOnly.allowOrigin ? "Origin (test 1): " + methodOnly.allowOrigin + "." : "Origin (test 1): lipsește.",
-      methodOnly.allowMethods ? "Metode permise: " + methodOnly.allowMethods + "." : "Metode permise: lipsesc.",
-      withContentType.allowHeaders ? "Antete permise: " + withContentType.allowHeaders + "." : "Antete permise: lipsesc."
-    ];
-    setMessage("#media-diagnose-message", parts.join(" "), signature.ok && cors.ok ? "success" : "error");
-  } catch (error) {
-    setMessage("#media-diagnose-message", error.message, "error");
-  } finally {
-    button.disabled = false;
-  }
-}
-$("#media-storage-diagnose").addEventListener("click", runBackblazeDiagnostic);
-
 async function loadConductorMedia() {
   try {
     const data = await requestJSON("/api/conductor/songs");
@@ -343,6 +313,18 @@ async function loadConductorMedia() {
   }
 }
 $("#media-library-reload").addEventListener("click", loadConductorMedia);
+
+const mediaLibraryToggle = $("#toggle-media-library");
+const mediaLibrarySection = $("#conductor-media-library");
+if (mediaLibraryToggle && mediaLibrarySection) {
+  mediaLibraryToggle.addEventListener("click", () => {
+    const isHidden = mediaLibrarySection.classList.toggle("hidden");
+    mediaLibraryToggle.setAttribute("aria-expanded", String(!isHidden));
+    mediaLibraryToggle.textContent = isHidden ? "Adaugă cântare" : "Închide biblioteca";
+    if (!isHidden) mediaLibrarySection.scrollIntoView({ behavior: "smooth", block: "start" });
+  });
+}
+
 $("#media-song-create-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   const form = event.currentTarget;
@@ -393,7 +375,7 @@ $("#media-upload-form").addEventListener("submit", async (event) => {
         body: file
       });
     } catch {
-      throw new Error("Browserul nu a putut citi răspunsul Backblaze. Poate fi preflight CORS, o semnătură respinsă sau o problemă de rețea. Apasă „Testează conexiunea B2” în Biblioteca de fișiere pentru a separa cauzele.");
+      throw new Error("Browserul nu a putut citi răspunsul Backblaze. Poate fi preflight CORS, o semnătură respinsă sau o problemă de rețea. Apasă „Testează conexiunea B2” în Biblioteca de fișiere din Dashboard pentru a separa cauzele.");
     }
     if (!uploadResponse.ok) {
       throw new Error("Backblaze a respins fișierul (HTTP " + uploadResponse.status + "). Verifică CORS și permisiunile cheii pentru bucket.");
