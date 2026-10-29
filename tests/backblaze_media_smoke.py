@@ -15,6 +15,13 @@ assert 'presignB2Object(config, "PUT"' in worker
 assert 'presignB2Object(config, "HEAD"' in worker
 assert 'presignB2Object(config, "GET"' in worker
 assert 'fetch(headUrl, { method: "HEAD" })' in worker
+diagnostic_start = worker.index("async function diagnoseMediaStorage(")
+diagnostic_end = worker.index("async function createSong(", diagnostic_start)
+diagnostic = worker[diagnostic_start:diagnostic_end]
+assert "const corsProbeUrl = config.endpoint.origin +" in diagnostic
+assert "fetch(corsProbeUrl, {" in diagnostic
+assert 'fetch(putUrl, {\n      method: "OPTIONS"' not in diagnostic, "CORS probe must not use a URL signed for PUT"
+
 assert 'status = \'pending\'' in worker
 
 # Public catalog responses expose only asset IDs/format/voice, never B2 object keys or credentials.

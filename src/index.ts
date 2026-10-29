@@ -1052,14 +1052,17 @@ async function diagnoseMediaStorage(request: Request, env: Env): Promise<Respons
     (signatureCode === "" || signatureCode === "NoSuchKey" || signatureCode === "NotFound");
 
   const origin = new URL(request.url).origin;
-  const putUrl = await presignB2Object(config, "PUT", objectKey, 60, "application/pdf");
+  // CORS preflight is an unsigned OPTIONS request. Do not send a URL signed for PUT,
+  // because the signature is method-specific and can produce a misleading 403.
+  const corsProbeUrl = config.endpoint.origin + "/" + awsEncode(config.bucket) + "/" +
+    objectKey.split("/").map(awsEncode).join("/");
   let preflightStatus = 0;
   let allowOrigin = "";
   let allowMethods = "";
   let allowHeaders = "";
   let preflightCode = "";
   try {
-    const response = await fetch(putUrl, {
+    const response = await fetch(corsProbeUrl, {
       method: "OPTIONS",
       headers: {
         "Origin": origin,
