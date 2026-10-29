@@ -54,7 +54,7 @@ assert "asset.status" not in catalog
 # All upload and download routes require an authenticated session plus conductor/member policy checks.
 for route in [
     '"/api/conductor/media/status"',
-    '"/api/conductor/media/diagnose"',
+assert '"/api/conductor/media/diagnose"' in dashboard_js
     '"/api/conductor/songs"',
     '"/api/conductor/assets/complete"',
 ]:
@@ -80,7 +80,7 @@ assert 'id="media-storage-diagnose"' not in home
 assert 'id="media-diagnose-message"' not in home
 assert 'id="media-storage-diagnose"' in dashboard
 assert 'id="media-diagnose-message"' in dashboard
-assert '"/api/conductor/media/diagnose"' in dashboard_js
+assert '"/api/conductor/media/diagnose"' not in app
 assert '"/api/conductor/media/diagnose"' in dashboard_js
 assert '/api/conductor/media/diagnose' not in home
 assert 'method: "PUT"' in app
@@ -101,7 +101,7 @@ assert 'corsMethodOnly' in worker and 'corsWithContentType' in worker
 assert 'Access-Control-Allow-Origin' in worker
 assert 'Access-Control-Allow-Methods' in worker
 assert 'Access-Control-Allow-Headers' in worker
-assert '"/api/conductor/media/diagnose"' in app
+assert '"/api/conductor/media/diagnose"' in dashboard_js
 assert 'Testează conexiunea B2' in dashboard
 assert 'Testează conexiunea B2' not in home
 assert 'Browserul nu a putut citi răspunsul Backblaze' in app
