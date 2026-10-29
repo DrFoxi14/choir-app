@@ -26,6 +26,11 @@ interface Env {
   DEFAULT_CHOIR_SLUG?: string;
   AUTH_SECRET?: string;
   BOOTSTRAP_SETUP_KEY?: string;
+  B2_ENDPOINT?: string;
+  B2_REGION?: string;
+  B2_BUCKET?: string;
+  B2_KEY_ID?: string;
+  B2_APP_KEY?: string;
 }
 interface ChoirRow { id: string; slug: string; name: string; }
 interface SessionRow {
