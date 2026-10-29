@@ -80,9 +80,9 @@ assert 'id="media-storage-diagnose"' not in home
 assert 'id="media-diagnose-message"' not in home
 assert 'id="media-storage-diagnose"' in dashboard
 assert 'id="media-diagnose-message"' in dashboard
-assert '"/api/conductor/media/diagnose"' not in dashboard_js
+assert '"/api/conductor/media/diagnose"' in dashboard_js
 assert '"/api/conductor/media/diagnose"' not in app
-assert '"/api/conductor/media/diagnose"' not in home
+assert '/api/conductor/media/diagnose' not in home
 assert 'method: "PUT"' in app
 assert '"/api/conductor/assets/complete"' in app
 assert '"/api/conductor/songs/" + encodeURIComponent(song.id) + "/publish"' in app
