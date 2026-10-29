@@ -68,7 +68,9 @@ assert "UNIQUE" in migration and "expires_at" in migration
 # Diagnostics compare a signed missing-object response with the real S3 CORS preflight.
 assert 'async function diagnoseMediaStorage' in worker
 assert '"Access-Control-Request-Method": "PUT"' in worker
-assert '"Access-Control-Request-Headers": "content-type"' in worker
+assert '"Access-Control-Request-Headers", "content-type"' in worker
+assert 'async function probeCors(includeContentType: boolean)' in worker
+assert 'corsMethodOnly' in worker and 'corsWithContentType' in worker
 assert 'Access-Control-Allow-Origin' in worker
 assert 'Access-Control-Allow-Methods' in worker
 assert 'Access-Control-Allow-Headers' in worker

@@ -232,19 +232,23 @@ function renderConductorMediaSongs() {
 async function runBackblazeDiagnostic() {
   const button = $("#media-storage-diagnose");
   button.disabled = true;
-  setMessage("#media-diagnose-message", "Se testează semnătura și preflight-ul CORS…");
+  setMessage("#media-diagnose-message", "Se testează semnătura și cele două variante CORS…");
   try {
     const result = await requestJSON("/api/conductor/media/diagnose");
     const signature = result.signature || {};
     const cors = result.cors || {};
+    const methodOnly = cors.methodOnly || {};
+    const withContentType = cors.withContentType || {};
     const parts = [
       "Semnătură: " + (signature.ok ? "OK" : "EȘEC") +
         " (HTTP " + signature.status + (signature.code ? ", " + signature.code : "") + ").",
-      "CORS: " + (cors.ok ? "OK" : "EȘEC") +
-        " (HTTP " + cors.status + (cors.code ? ", " + cors.code : "") + ").",
-      cors.allowOrigin ? "Allow-Origin: " + cors.allowOrigin + "." : "Allow-Origin: lipsește.",
-      cors.allowMethods ? "Allow-Methods: " + cors.allowMethods + "." : "Allow-Methods: lipsește.",
-      cors.allowHeaders ? "Allow-Headers: " + cors.allowHeaders + "." : "Allow-Headers: lipsește."
+      "CORS fără antet custom: " + (methodOnly.ok ? "OK" : "EȘEC") +
+        " (HTTP " + methodOnly.status + (methodOnly.code ? ", " + methodOnly.code : "") + ").",
+      "CORS cu content-type: " + (withContentType.ok ? "OK" : "EȘEC") +
+        " (HTTP " + withContentType.status + (withContentType.code ? ", " + withContentType.code : "") + ").",
+      methodOnly.allowOrigin ? "Origin (test 1): " + methodOnly.allowOrigin + "." : "Origin (test 1): lipsește.",
+      methodOnly.allowMethods ? "Metode permise: " + methodOnly.allowMethods + "." : "Metode permise: lipsesc.",
+      withContentType.allowHeaders ? "Antete permise: " + withContentType.allowHeaders + "." : "Antete permise: lipsesc."
     ];
     setMessage("#media-diagnose-message", parts.join(" "), signature.ok && cors.ok ? "success" : "error");
   } catch (error) {

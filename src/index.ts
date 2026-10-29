@@ -1052,42 +1052,52 @@ async function diagnoseMediaStorage(request: Request, env: Env): Promise<Respons
     (signatureCode === "" || signatureCode === "NoSuchKey" || signatureCode === "NotFound");
 
   const origin = new URL(request.url).origin;
-  // CORS preflight is an unsigned OPTIONS request. Do not send a URL signed for PUT,
-  // because the signature is method-specific and can produce a misleading 403.
+  // Test the method separately from the requested header so the diagnosis tells us
+  // whether the bucket rule excludes PUT or only excludes content-type.
   const corsProbeUrl = config.endpoint.origin + "/" + awsEncode(config.bucket) + "/" +
     objectKey.split("/").map(awsEncode).join("/");
-  let preflightStatus = 0;
-  let allowOrigin = "";
-  let allowMethods = "";
-  let allowHeaders = "";
-  let preflightCode = "";
-  try {
-    const response = await fetch(corsProbeUrl, {
-      method: "OPTIONS",
-      headers: {
-        "Origin": origin,
-        "Access-Control-Request-Method": "PUT",
-        "Access-Control-Request-Headers": "content-type"
-      }
+  async function probeCors(includeContentType: boolean): Promise<{
+    status: number; allowOrigin: string; allowMethods: string; allowHeaders: string;
+    code: string; ok: boolean;
+  }> {
+    let status = 0;
+    let allowOrigin = "";
+    let allowMethods = "";
+    let allowHeaders = "";
+    let code = "";
+    const headers = new Headers({
+      "Origin": origin,
+      "Access-Control-Request-Method": "PUT"
     });
-    preflightStatus = response.status;
-    allowOrigin = response.headers.get("Access-Control-Allow-Origin") ?? "";
-    allowMethods = response.headers.get("Access-Control-Allow-Methods") ?? "";
-    allowHeaders = response.headers.get("Access-Control-Allow-Headers") ?? "";
-    const body = (await response.text()).slice(0, 3000);
-    preflightCode = body.match(/<Code>([^<]+)<\/Code>/i)?.[1] ?? "";
-  } catch {
-    preflightCode = "NetworkError";
+    if (includeContentType) headers.set("Access-Control-Request-Headers", "content-type");
+    try {
+      const response = await fetch(corsProbeUrl, { method: "OPTIONS", headers });
+      status = response.status;
+      allowOrigin = response.headers.get("Access-Control-Allow-Origin") ?? "";
+      allowMethods = response.headers.get("Access-Control-Allow-Methods") ?? "";
+      allowHeaders = response.headers.get("Access-Control-Allow-Headers") ?? "";
+      const body = (await response.text()).slice(0, 3000);
+      code = body.match(/<Code>([^<]+)<\/Code>/i)?.[1] ?? "";
+    } catch {
+      code = "NetworkError";
+    }
+    const methods = allowMethods.toUpperCase().split(",").map((value) => value.trim());
+    const headersAllowed = allowHeaders.toLowerCase().split(",").map((value) => value.trim());
+    const originPass = allowOrigin === origin;
+    const methodPass = methods.includes("PUT");
+    const headerPass = !includeContentType || headersAllowed.includes("*") || headersAllowed.includes("content-type");
+    return {
+      status, allowOrigin, allowMethods, allowHeaders, code,
+      ok: status >= 200 && status < 300 && originPass && methodPass && headerPass
+    };
   }
-  const methods = allowMethods.toUpperCase().split(",").map((value) => value.trim());
-  const headers = allowHeaders.toLowerCase().split(",").map((value) => value.trim());
-  const corsPass = (preflightStatus >= 200 && preflightStatus < 300) &&
-    allowOrigin === origin &&
-    methods.includes("PUT") &&
-    (headers.includes("*") || headers.includes("content-type"));
-
+  const corsMethodOnly = await probeCors(false);
+  const corsWithContentType = await probeCors(true);
+  const corsPass = corsMethodOnly.ok && corsWithContentType.ok;
   await recordAudit(env, current.choirId, current.userId, "conductor.media.connection_diagnosed", "media_storage", null, {
-    signatureStatus, signatureCode: signatureCode || null, preflightStatus, preflightCode: preflightCode || null,
+    signatureStatus, signatureCode: signatureCode || null,
+    corsMethodStatus: corsMethodOnly.status, corsMethodCode: corsMethodOnly.code || null,
+    corsContentTypeStatus: corsWithContentType.status, corsContentTypeCode: corsWithContentType.code || null,
     corsPass
   });
   return json({
@@ -1102,14 +1112,24 @@ async function diagnoseMediaStorage(request: Request, env: Env): Promise<Respons
     },
     cors: {
       ok: corsPass,
-      status: preflightStatus,
-      allowOrigin: allowOrigin || null,
-      allowMethods: allowMethods || null,
-      allowHeaders: allowHeaders || null,
-      code: preflightCode || null,
+      methodOnly: {
+        ok: corsMethodOnly.ok,
+        status: corsMethodOnly.status,
+        allowOrigin: corsMethodOnly.allowOrigin || null,
+        allowMethods: corsMethodOnly.allowMethods || null,
+        code: corsMethodOnly.code || null
+      },
+      withContentType: {
+        ok: corsWithContentType.ok,
+        status: corsWithContentType.status,
+        allowOrigin: corsWithContentType.allowOrigin || null,
+        allowMethods: corsWithContentType.allowMethods || null,
+        allowHeaders: corsWithContentType.allowHeaders || null,
+        code: corsWithContentType.code || null
+      },
       message: corsPass
         ? "Preflight-ul CORS pentru PUT și content-type este acceptat."
-        : "Regula CORS nu a confirmat origine, metoda PUT și antetul content-type."
+        : "Testele separate arată dacă regula CORS blochează metoda PUT sau antetul content-type."
     }
   });
 }
