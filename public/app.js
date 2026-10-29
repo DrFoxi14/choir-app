@@ -1,4 +1,4 @@
-const roleNames = { owner: "Dirijor principal", conductor: "Dirijor", member: "Membru" };
+const roleNames = { owner: "Dirijor", conductor: "Dirijor", member: "Membru" };
 const voiceNames = { S: "Sopran", A: "Alto", T: "Tenor", B: "Bas" };
 const $ = (selector) => document.querySelector(selector);
 
@@ -199,6 +199,72 @@ function renderConductorMediaSongs() {
     } else {
       addText(card, "p", "muted compact", "Niciun fișier încărcat.");
     }
+    if (song.status !== "archived") {
+      const adminActions = document.createElement("div");
+      adminActions.className = "song-admin-actions";
+      const deleteToggle = document.createElement("button");
+      deleteToggle.className = "danger-button";
+      deleteToggle.type = "button";
+      deleteToggle.textContent = "Șterge cântarea";
+      const deleteForm = document.createElement("form");
+      deleteForm.className = "song-delete-form hidden";
+      addText(deleteForm, "p", "warning-text",
+        "Cântarea va fi scoasă din repertoriu. Fișierele din Backblaze B2 nu sunt șterse fizic.");
+      const pinLabel = document.createElement("label");
+      pinLabel.textContent = "Confirmă cu PIN-ul tău de dirijor (6 cifre)";
+      const pinInput = document.createElement("input");
+      pinInput.type = "password";
+      pinInput.inputMode = "numeric";
+      pinInput.pattern = "[0-9]{6}";
+      pinInput.minLength = 6;
+      pinInput.maxLength = 6;
+      pinInput.autocomplete = "current-password";
+      pinInput.required = true;
+      const controls = document.createElement("div");
+      controls.className = "inline-actions";
+      const confirmDelete = document.createElement("button");
+      confirmDelete.className = "danger-button";
+      confirmDelete.type = "submit";
+      confirmDelete.textContent = "Confirmă ștergerea";
+      const cancelDelete = document.createElement("button");
+      cancelDelete.className = "secondary-button";
+      cancelDelete.type = "button";
+      cancelDelete.textContent = "Anulează";
+      cancelDelete.addEventListener("click", () => {
+        pinInput.value = "";
+        deleteForm.classList.add("hidden");
+        deleteToggle.classList.remove("hidden");
+      });
+      deleteToggle.addEventListener("click", () => {
+        deleteToggle.classList.add("hidden");
+        deleteForm.classList.remove("hidden");
+        pinInput.focus();
+      });
+      deleteForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        confirmDelete.disabled = true;
+        setMessage("#media-upload-message", "Se confirmă identitatea și se scoate cântarea din repertoriu…");
+        try {
+          const result = await requestJSON(
+            "/api/conductor/songs/" + encodeURIComponent(song.id) + "/delete",
+            "POST",
+            { pin: pinInput.value }
+          );
+          pinInput.value = "";
+          setMessage("#media-upload-message", result.message || "Cântarea a fost scoasă din repertoriu.", "success");
+          await loadConductorMedia();
+          await loadSongs($("#conductor-voice").value, true);
+        } catch (error) {
+          setMessage("#media-upload-message", error.message, "error");
+        } finally {
+          confirmDelete.disabled = false;
+        }
+      });
+      deleteForm.append(pinLabel, pinInput, controls);
+      controls.append(confirmDelete, cancelDelete);
+      adminActions.append(deleteToggle, deleteForm);
+      card.append(adminActions);
+    }
     if (song.status === "draft") {
       const publish = document.createElement("button");
       publish.className = "secondary-button media-publish-button";
@@ -360,6 +426,8 @@ function hideIssuedCode() {
 }
 function enterApp(user) {
   state.user = user;
+  const adminDashboardLink = $("#admin-dashboard-link");
+  if (adminDashboardLink) adminDashboardLink.classList.toggle("hidden", user.role !== "owner");
   hideNotice();
   $("#user-summary").textContent = user.displayName + " · " + (roleNames[user.role] || user.role);
   $("#user-summary").classList.remove("hidden");
