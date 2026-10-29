@@ -11,6 +11,7 @@ db.executescript((root / "migrations" / "0002_member_auth_and_conductors.sql").r
 db.executescript((root / "migrations" / "0003_member_phone_verification.sql").read_text())
 db.executescript((root / "migrations" / "0004_preferences_attendance.sql").read_text())
 db.executescript((root / "migrations" / "0005_backblaze_media.sql").read_text())
+db.executescript((root / "migrations" / "0006_immutable_audit_logs.sql").read_text())
 
 columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
 for required in {"login_code_hash", "pin_salt", "pin_hash"}:
@@ -164,6 +165,25 @@ recorded_versions = db.execute(
 assert recorded_versions == ("2026-10-28-v1", "2026-10-28-v1"), (
     f"Legal acceptance versions were not recorded correctly: {recorded_versions}"
 )
+
+# The audit trail accepts inserts, but database triggers reject UPDATE and DELETE.
+immutable_id = "legal-acceptance-test"
+try:
+    db.execute("UPDATE audit_logs SET action='tampered' WHERE id=?", (immutable_id,))
+except sqlite3.IntegrityError:
+    pass
+else:
+    raise AssertionError("Audit records must reject UPDATE")
+try:
+    db.execute("DELETE FROM audit_logs WHERE id=?", (immutable_id,))
+except sqlite3.IntegrityError:
+    pass
+else:
+    raise AssertionError("Audit records must reject DELETE")
+immutable_row = db.execute(
+    "SELECT action FROM audit_logs WHERE id=?", (immutable_id,)
+).fetchone()
+assert immutable_row == ("legal.terms.accepted",), "Audit record changed or disappeared"
 
 fk_errors = list(db.execute("PRAGMA foreign_key_check"))
 assert not fk_errors, f"Foreign key violations: {fk_errors}"
