@@ -1412,12 +1412,12 @@ async function downloadSongAsset(request: Request, env: Env, assetId: string): P
   const signedUrl = await presignB2Object(config, "GET", asset.objectKey, 300);
   const requestedName = safeUploadFileName(asset.fileName);
   const fallbackName = (asset.songTitle || "cantare").normalize("NFKD")
-    .replace(/[\\u0300-\\u036f]/g, "")
+    .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-zA-Z0-9._ -]/g, "")
-    .trim().replace(/\\s+/g, "-").slice(0, 100) || "cantare";
+    .trim().replace(/\s+/g, "-").slice(0, 100) || "cantare";
   const baseName = requestedName || (fallbackName + (asset.format === "pdf" ? ".pdf" : asset.format === "audio" ? ".audio" : ".video"));
   // ASCII fallback plus RFC 5987 UTF-8 form; escape quotes and control chars first.
-  const safeAsciiName = baseName.normalize("NFKD").replace(/[\\u0300-\\u036f]/g, "")
+  const safeAsciiName = baseName.normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-zA-Z0-9._ -]/g, "_").replace(/["\\\\]/g, "_").slice(0, 180) || "fisier";
   const utf8Name = encodeURIComponent(baseName).replace(/['()*]/g, (char) =>
     "%" + char.charCodeAt(0).toString(16).toUpperCase()
@@ -1537,7 +1537,7 @@ async function saveAttendance(request: Request, env: Env): Promise<Response> {
   if (typeof body.title !== "string") {
     return fail("invalid_attendance_title", "Completează denumirea repetiției.", 400);
   }
-  const title = body.title.trim().replace(/[\\u0000-\\u001f\\u007f]/g, "").replace(/\\s+/g, " ");
+  const title = body.title.trim().replace(/[\\u0000-\\u001f\\u007f]/g, "").replace(/\s+/g, " ");
   if (!title || title.length > 80) {
     return fail("invalid_attendance_title", "Denumirea trebuie să aibă între 1 și 80 de caractere.", 400);
   }
