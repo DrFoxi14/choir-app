@@ -1330,7 +1330,7 @@ async function completeMediaUpload(request: Request, env: Env): Promise<Response
     storedType = (verifyResponse.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
     if (verifyResponse.status === 206) {
       const contentRange = verifyResponse.headers.get("Content-Range") || "";
-      const match = contentRange.match(/^bytes\\s+\\d+-\\d+\\/(\\d+)$/i);
+      const match = contentRange.match(/^bytes\s+\d+-\d+\/(\d+)$/i);
       storedSize = match ? Number(match[1]) : 0;
     } else {
       // If the endpoint ignores Range, still cancel the response body promptly.
