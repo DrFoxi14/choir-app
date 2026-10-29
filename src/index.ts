@@ -289,6 +289,24 @@ async function recordAudit(
     "VALUES (?, ?, ?, ?, ?, ?, ?)"
   ).bind(crypto.randomUUID(), choirId, actorId, action, targetType, targetId, JSON.stringify(metadata)).run();
 }
+function sanitizeAuditMetadata(raw: string | null): Record<string, string | number | boolean | null> {
+  if (!raw) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return {};
+  const safe: Record<string, string | number | boolean | null> = {};
+  for (const [key, value] of Object.entries(parsed as Record<string, unknown>)) {
+    if (/(phone|pin|code|token|secret|password|email|hash|ip|object.?key|signed.?url)/i.test(key)) continue;
+    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean" || value === null) {
+      safe[key] = value;
+    }
+  }
+  return safe;
+}
 async function hasCurrentLegalAcceptance(env: Env, userId: string, choirId: string): Promise<boolean> {
   if (!env.DB) return false;
   const result = await env.DB.prepare(
@@ -1186,6 +1204,74 @@ async function publishSong(request: Request, env: Env, songId: string): Promise<
   await recordAudit(env, current.choirId, current.userId, "conductor.song.published", "song", songId, { title: song.title });
   return json({ message: "Cântarea și fișierele ei sunt publicate pentru vocile asociate." });
 }
+async function deleteSong(request: Request, env: Env, songId: string): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot șterge cântări.", 403);
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+
+  const body = await readJson(request, 1024);
+  if (!body || !validPin(body.pin)) {
+    return fail("invalid_pin", "Introdu PIN-ul contului tău din 6 cifre pentru a confirma ștergerea.", 400);
+  }
+  if (!(await allowAttempt(request, env, "song-delete-ip", 12)) ||
+      !(await allowAttempt(request, env, "song-delete-user", 6, await sha256(current.userId)))) {
+    return fail("rate_limited", "Prea multe încercări. Reîncearcă peste 15 minute.", 429);
+  }
+
+  const found = await env.DB.prepare(
+    "SELECT id, title, status FROM songs WHERE id = ? AND choir_id = ? LIMIT 1"
+  ).bind(songId, current.choirId).all<{ id: string; title: string; status: string }>();
+  const song = found.results?.[0];
+  if (!song) return fail("song_not_found", "Cântarea nu a fost găsită.", 404);
+  if (song.status === "archived") return fail("song_already_archived", "Cântarea este deja scoasă din repertoriu.", 409);
+
+  const credentialResult = await env.DB.prepare(
+    "SELECT pin_salt AS pinSalt, pin_hash AS pinHash FROM users WHERE id = ? AND status = 'active' LIMIT 1"
+  ).bind(current.userId).all<{ pinSalt: string; pinHash: string }>();
+  const credentials = credentialResult.results?.[0];
+  const calculatedHash = await derivePinHash(
+    body.pin,
+    credentials?.pinSalt || "00000000000000000000000000000000"
+  );
+  if (!credentials?.pinHash || !constantTimeEqual(calculatedHash, credentials.pinHash)) {
+    await recordAudit(env, current.choirId, current.userId, "conductor.song.delete_reauthentication_failed", "song", songId, {
+      title: song.title,
+      reason: "invalid_pin"
+    });
+    return fail("invalid_pin", "PIN incorect. Cântarea nu a fost ștearsă.", 401);
+  }
+
+  const now = new Date().toISOString();
+  const auditId = crypto.randomUUID();
+  const metadata = JSON.stringify({
+    title: song.title,
+    resultingStatus: "archived",
+    mediaObjectsRetained: true
+  });
+  // D1 batch is transactional: audit is inserted only if the state transition succeeds.
+  const results = await env.DB.batch([
+    env.DB.prepare(
+      "UPDATE songs SET status = 'archived', updated_at = ? " +
+      "WHERE id = ? AND choir_id = ? AND status IN ('draft', 'published')"
+    ).bind(now, songId, current.choirId),
+    env.DB.prepare(
+      "INSERT INTO audit_logs (id, choir_id, actor_user_id, action, target_type, target_id, metadata_json) " +
+      "SELECT ?, ?, ?, 'conductor.song.deleted', 'song', ?, ? WHERE changes() = 1"
+    ).bind(auditId, current.choirId, current.userId, songId, metadata),
+    env.DB.prepare(
+      "UPDATE song_assets SET status = 'archived', updated_at = ? " +
+      "WHERE song_id = ? AND choir_id = ? AND status IN ('draft', 'published') " +
+      "AND EXISTS (SELECT 1 FROM songs WHERE id = ? AND choir_id = ? AND status = 'archived' AND updated_at = ?)"
+    ).bind(now, songId, current.choirId, songId, current.choirId, now)
+  ]);
+  if (Number(results[0]?.meta?.changes ?? 0) !== 1) {
+    return fail("song_already_archived", "Cântarea a fost modificată de altă cerere. Reîncarcă repertoriul.", 409);
+  }
+  return json({
+    message: "Cântarea a fost scoasă din repertoriu și arhivată. Fișierele rămân private în Backblaze B2."
+  });
+}
 async function prepareMediaUpload(request: Request, env: Env, songId: string): Promise<Response> {
   const current = await requireSession(request, env);
   if (current instanceof Response) return current;
@@ -1484,6 +1570,48 @@ async function listMemberContacts(request: Request, env: Env): Promise<Response>
     "choir", current.choirId, { memberCount: members.length }
   );
   return json({ members, actorRole: current.role });
+}
+async function getAdminAuditLog(request: Request, env: Env): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (current.role !== "owner" || !(await hasCurrentLegalAcceptance(env, current.userId, current.choirId))) {
+    return fail("forbidden", "Dashboard-ul de administrare este disponibil numai contului autorizat.", 403);
+  }
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+
+  const url = new URL(request.url);
+  const requestedLimit = Number(url.searchParams.get("limit") || "200");
+  const limit = Number.isFinite(requestedLimit) ? Math.max(1, Math.min(200, Math.floor(requestedLimit))) : 200;
+  const [logsResult, countResult] = await Promise.all([
+    env.DB.prepare(
+      "SELECT a.id, a.created_at AS createdAt, a.action, a.target_type AS targetType, " +
+      "a.target_id AS targetId, a.metadata_json AS metadataJson, " +
+      "COALESCE(u.display_name, 'Cont indisponibil / sistem') AS actorName, m.role AS actorRole " +
+      "FROM audit_logs a " +
+      "LEFT JOIN users u ON u.id = a.actor_user_id " +
+      "LEFT JOIN choir_memberships m ON m.choir_id = a.choir_id AND m.user_id = a.actor_user_id " +
+      "WHERE a.choir_id = ? ORDER BY a.created_at DESC, a.rowid DESC LIMIT ?"
+    ).bind(current.choirId, limit).all<{
+      id: string; createdAt: string; action: string; targetType: string | null;
+      targetId: string | null; metadataJson: string | null; actorName: string; actorRole: Role | null;
+    }>(),
+    env.DB.prepare("SELECT COUNT(*) AS totalCount FROM audit_logs WHERE choir_id = ?")
+      .bind(current.choirId).all<{ totalCount: number }>()
+  ]);
+  await recordAudit(env, current.choirId, current.userId, "owner.audit_dashboard.viewed", "choir", current.choirId, {
+    returnedCount: logsResult.results?.length ?? 0
+  });
+  const logs = (logsResult.results ?? []).map((row) => ({
+    id: row.id,
+    createdAt: row.createdAt,
+    action: row.action,
+    targetType: row.targetType,
+    targetId: row.targetId,
+    actorName: row.actorName,
+    actorRole: row.actorRole === "member" ? "Membru" : row.actorRole ? "Dirijor" : null,
+    metadata: sanitizeAuditMetadata(row.metadataJson)
+  }));
+  return json({ logs, totalCount: countResult.results?.[0]?.totalCount ?? 0, limit });
 }
 async function listMembers(request: Request, env: Env): Promise<Response> {
   const current = await requireSession(request, env);
@@ -1850,6 +1978,7 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
     } : { authenticated: false, authenticationConfigured: true });
   }
   if (request.method === "GET" && path === "/api/account/preferences") return getAccountPreferences(request, env);
+  if (request.method === "GET" && path === "/api/dashboard/logs") return getAdminAuditLog(request, env);
   if (request.method === "GET" && path === "/api/conductor/attendance") return getAttendanceReport(request, env);
   if (request.method !== "GET" && request.method !== "POST") {
     return fail("method_not_allowed", "Metoda nu este permisă.", 405);
@@ -1874,6 +2003,8 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === "GET" && path === "/api/songs") return listSongs(request, env);
   const songPublishMatch = path.match(/^\/api\/conductor\/songs\/([a-f0-9-]{36})\/publish$/);
   if (request.method === "POST" && songPublishMatch) return publishSong(request, env, songPublishMatch[1]);
+  const songDeleteMatch = path.match(/^\/api\/conductor\/songs\/([a-f0-9-]{36})\/delete$/);
+  if (request.method === "POST" && songDeleteMatch) return deleteSong(request, env, songDeleteMatch[1]);
   const songUploadMatch = path.match(/^\/api\/conductor\/songs\/([a-f0-9-]{36})\/assets\/upload-url$/);
   if (request.method === "POST" && songUploadMatch) return prepareMediaUpload(request, env, songUploadMatch[1]);
   const assetDownloadMatch = path.match(/^\/api\/assets\/([a-f0-9-]{36})\/download$/);
@@ -1916,7 +2047,19 @@ export default {
         );
       }
     }
+    if (url.pathname === "/dashboard" || url.pathname === "/dashboard/") {
+      const current = await getCurrentSession(request, env);
+      if (!current || current.role !== "owner" ||
+          !(await hasCurrentLegalAcceptance(env, current.userId, current.choirId))) {
+        return new Response(null, {
+          status: 302,
+          headers: { "Location": "/", "Cache-Control": "no-store, max-age=0" }
+        });
+      }
+    }
     const staticPages: Record<string, string> = {
+      "/dashboard": "dashboard.html",
+      "/dashboard/": "dashboard.html",
       "/invitation": "invitation.html",
       "/invitation/": "invitation.html",
       "/account": "account.html",
