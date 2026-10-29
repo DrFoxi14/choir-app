@@ -389,3 +389,16 @@ html[data-accent-theme="berry"] { --accent: #D778A5; --navy: #853456; --accent-i
   .audit-summary-grid { grid-template-columns: 1fr; }
   .audit-toolbar > button, .audit-toolbar > a { flex: 1 1 140px; }
 }
+
+
+/* Compact conductor actions and dashboard storage diagnostics */
+.danger-button-compact {
+  min-height: 28px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: .78rem;
+  font-weight: 650;
+}
+.dashboard-diagnostic-panel { margin-bottom: 2px; }
+.dashboard-diagnostic-panel .audit-heading-row > div { min-width: 0; }
+.dashboard-diagnostic-panel .form-message { margin: 8px 0 0; overflow-wrap: anywhere; }
