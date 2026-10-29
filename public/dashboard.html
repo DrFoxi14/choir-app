@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="ro">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#172554">
+  <meta name="description" content="Jurnalul de audit pentru administrarea Choir App — Corul Tabor.">
+  <title>Dashboard · Choir App</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/dashboard.js" defer></script>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div class="brand-mark" aria-hidden="true">♪</div>
+      <div class="brand-copy">
+        <p class="eyebrow">CORUL TABOR</p>
+        <h1>Choir App</h1>
+      </div>
+      <div class="header-actions">
+        <a class="text-button" href="/">Repertoriu</a>
+        <a class="text-button" href="/account">Contul meu</a>
+      </div>
+    </header>
+
+    <section class="audit-page-content" aria-labelledby="audit-title">
+      <div>
+        <p class="eyebrow">ZONĂ PRIVATĂ DE ADMINISTRARE</p>
+        <h2 id="audit-title">Dashboard</h2>
+        <p class="muted">Jurnal cronologic al acțiunilor din Choir App. Fiecare eveniment este asociat contului care l-a inițiat, când identitatea este disponibilă.</p>
+      </div>
+
+      <div class="audit-summary-grid" aria-live="polite">
+        <div class="audit-summary-card">
+          <p>Înregistrări în jurnal</p>
+          <strong id="audit-total">—</strong>
+        </div>
+        <div class="audit-summary-card">
+          <p>Evenimente încărcate</p>
+          <strong id="audit-loaded">—</strong>
+        </div>
+      </div>
+
+      <p class="audit-no-delete-note">Jurnalul este numai pentru citire. Interfața nu oferă acțiuni de editare sau ștergere, iar baza de date respinge operațiile UPDATE și DELETE asupra jurnalului.</p>
+
+      <section class="panel auth-panel" aria-labelledby="audit-log-heading">
+        <div class="audit-heading-row">
+          <h3 id="audit-log-heading">Loguri</h3>
+          <button id="audit-refresh" class="secondary-button" type="button">Reîncarcă</button>
+        </div>
+        <div class="audit-toolbar">
+          <label for="audit-search" class="hidden">Caută în loguri</label>
+          <input id="audit-search" type="search" placeholder="Caută după persoană, acțiune sau cântare">
+        </div>
+        <p id="audit-status" class="form-message" role="status">Se încarcă jurnalul…</p>
+        <div class="audit-table-wrap">
+          <table class="audit-table">
+            <thead>
+              <tr>
+                <th scope="col">Data și ora</th>
+                <th scope="col">Cine</th>
+                <th scope="col">Acțiune</th>
+                <th scope="col">Obiect</th>
+                <th scope="col">Detalii</th>
+              </tr>
+            </thead>
+            <tbody id="audit-log-list">
+              <tr><td colspan="5">Se încarcă înregistrările…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="muted compact">Sunt afișate cele mai recente 200 de evenimente. Jurnalul complet rămâne păstrat în D1.</p>
+      </section>
+    </section>
+
+    <footer>
+      <p>Corul Tabor · Choir App</p>
+      <p><a href="/">Înapoi la aplicație</a></p>
+    </footer>
+  </main>
+</body>
+</html>
