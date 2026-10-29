@@ -1284,14 +1284,66 @@ async function completeMediaUpload(request: Request, env: Env): Promise<Response
   } catch {
     return fail("backblaze_unreachable", "Nu am putut verifica fișierul în Backblaze. Încearcă din nou.", 502);
   }
-  if (headResponse.status === 404 || headResponse.status === 403) {
-    return fail("uploaded_file_not_found", "Fișierul nu a fost găsit în Backblaze. Verifică dacă încărcarea s-a terminat.", 422);
+
+  let storedSize = 0;
+  let storedType = "";
+  if (headResponse.status === 404) {
+    return fail("uploaded_file_not_found", "Backblaze nu găsește obiectul la calea înregistrată pentru acest upload (HTTP 404).", 422);
   }
-  if (!headResponse.ok) {
-    return fail("backblaze_head_failed", "Backblaze nu a putut valida fișierul încărcat.", 502);
+
+  if (headResponse.status === 403) {
+    // Some S3-compatible responses reject a presigned HEAD even when the uploaded
+    // object can be read. Fall back to a one-byte ranged GET to verify existence
+    // without downloading the whole media file.
+    const verifyUrl = await presignB2Object(config, "GET", upload.objectKey, 60);
+    let verifyResponse: Response;
+    try {
+      verifyResponse = await fetch(verifyUrl, {
+        method: "GET",
+        headers: { Range: "bytes=0-0" }
+      });
+    } catch {
+      return fail("backblaze_unreachable", "Nu am putut verifica fișierul în Backblaze. Încearcă din nou.", 502);
+    }
+
+    if (verifyResponse.status === 404) {
+      await verifyResponse.body?.cancel().catch(() => {});
+      return fail("uploaded_file_not_found", "Backblaze nu găsește obiectul la calea înregistrată pentru acest upload (HTTP 404).", 422);
+    }
+    if (verifyResponse.status === 403) {
+      const errorBody = (await verifyResponse.text()).slice(0, 1000);
+      const errorCode = errorBody.match(/<Code>([^<]+)<\/Code>/i)?.[1];
+      return fail(
+        "backblaze_verification_denied",
+        "Backblaze a refuzat verificarea fișierului (HTTP 403" +
+          (errorCode ? ", " + errorCode : "") +
+          "). Verifică permisiunea de citire a cheii B2 configurate în Cloudflare.",
+        502
+      );
+    }
+    if (!verifyResponse.ok) {
+      const status = verifyResponse.status;
+      await verifyResponse.body?.cancel().catch(() => {});
+      return fail("backblaze_verification_failed", "Backblaze nu a putut verifica fișierul (HTTP " + status + ").", 502);
+    }
+
+    storedType = (verifyResponse.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+    if (verifyResponse.status === 206) {
+      const contentRange = verifyResponse.headers.get("Content-Range") || "";
+      const match = contentRange.match(/^bytes\s+\d+-\d+\/(\d+)$/i);
+      storedSize = match ? Number(match[1]) : 0;
+    } else {
+      // If the endpoint ignores Range, still cancel the response body promptly.
+      storedSize = Number(verifyResponse.headers.get("Content-Length") || 0);
+    }
+    await verifyResponse.body?.cancel().catch(() => {});
+  } else if (!headResponse.ok) {
+    return fail("backblaze_head_failed", "Backblaze nu a putut valida fișierul încărcat (HTTP " + headResponse.status + ").", 502);
+  } else {
+    storedSize = Number(headResponse.headers.get("Content-Length") || 0);
+    storedType = (headResponse.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
   }
-  const storedSize = Number(headResponse.headers.get("Content-Length") || 0);
-  const storedType = (headResponse.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+
   if (storedSize !== upload.sizeBytes || storedType !== upload.contentType.toLowerCase()) {
     return fail("uploaded_file_mismatch", "Dimensiunea sau tipul fișierului încărcat nu corespunde cererii.", 422);
   }
