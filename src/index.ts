@@ -1679,7 +1679,17 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === "POST" && path === "/api/account/phone") return updateAccountPhone(request, env);
   if (request.method === "POST" && path === "/api/account/preferences") return saveAccountPreferences(request, env);
   if (request.method === "POST" && path === "/api/conductor/attendance") return saveAttendance(request, env);
+  if (request.method === "GET" && path === "/api/conductor/media/status") return getMediaStorageStatus(request, env);
+  if (request.method === "GET" && path === "/api/conductor/songs") return listConductorSongs(request, env);
+  if (request.method === "POST" && path === "/api/conductor/songs") return createSong(request, env);
+  if (request.method === "POST" && path === "/api/conductor/assets/complete") return completeMediaUpload(request, env);
   if (request.method === "GET" && path === "/api/songs") return listSongs(request, env);
+  const songPublishMatch = path.match(/^\\/api\\/conductor\\/songs\\/([a-f0-9-]{36})\\/publish$/);
+  if (request.method === "POST" && songPublishMatch) return publishSong(request, env, songPublishMatch[1]);
+  const songUploadMatch = path.match(/^\\/api\\/conductor\\/songs\\/([a-f0-9-]{36})\\/assets\\/upload-url$/);
+  if (request.method === "POST" && songUploadMatch) return prepareMediaUpload(request, env, songUploadMatch[1]);
+  const assetDownloadMatch = path.match(/^\\/api\\/assets\\/([a-f0-9-]{36})\\/download$/);
+  if (request.method === "GET" && assetDownloadMatch) return downloadSongAsset(request, env, assetDownloadMatch[1]);
   if (request.method === "GET" && path === "/api/conductor/members") return listMembers(request, env);
   if (request.method === "POST" && path === "/api/conductor/contacts") return listMemberContacts(request, env);
   if (request.method === "GET" && path === "/api/conductor/invitations") return listInvitations(request, env);
