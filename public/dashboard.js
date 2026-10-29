@@ -39,6 +39,48 @@ const detailNames = {
 };
 let allLogs = [];
 
+async function runBackblazeDiagnostic() {
+  const button = $("#media-storage-diagnose");
+  const message = $("#media-diagnose-message");
+  if (!button || !message) return;
+  button.disabled = true;
+  message.textContent = "Se testează semnătura și cele două variante CORS…";
+  message.classList.remove("message-error", "message-success");
+  try {
+    const response = await fetch("/api/conductor/media/diagnose", {
+      method: "GET",
+      credentials: "same-origin",
+      headers: { Accept: "application/json" },
+      cache: "no-store"
+    });
+    let result = {};
+    try { result = await response.json(); } catch { /* handled by status below */ }
+    if (!response.ok) throw new Error(result.message || "Testul conexiunii a eșuat.");
+    const signature = result.signature || {};
+    const cors = result.cors || {};
+    const methodOnly = cors.methodOnly || {};
+    const withContentType = cors.withContentType || {};
+    const parts = [
+      "Semnătură: " + (signature.ok ? "OK" : "EȘEC") +
+        " (HTTP " + signature.status + (signature.code ? ", " + signature.code : "") + ").",
+      "CORS fără antet custom: " + (methodOnly.ok ? "OK" : "EȘEC") +
+        " (HTTP " + methodOnly.status + (methodOnly.code ? ", " + methodOnly.code : "") + ").",
+      "CORS cu content-type: " + (withContentType.ok ? "OK" : "EȘEC") +
+        " (HTTP " + withContentType.status + (withContentType.code ? ", " + withContentType.code : "") + ").",
+      methodOnly.allowOrigin ? "Origin (test 1): " + methodOnly.allowOrigin + "." : "Origin (test 1): lipsește.",
+      methodOnly.allowMethods ? "Metode permise: " + methodOnly.allowMethods + "." : "Metode permise: lipsesc.",
+      withContentType.allowHeaders ? "Antete permise: " + withContentType.allowHeaders + "." : "Antete permise: lipsesc."
+    ];
+    message.textContent = parts.join(" ");
+    message.classList.toggle("message-success", Boolean(signature.ok && cors.ok));
+    message.classList.toggle("message-error", !(signature.ok && cors.ok));
+  } catch (error) {
+    message.textContent = error instanceof Error ? error.message : "Testul conexiunii a eșuat.";
+    message.classList.add("message-error");
+  } finally {
+    button.disabled = false;
+  }
+}
 function formatDate(value) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value || "—" : date.toLocaleString("ro-RO", {
@@ -139,6 +181,7 @@ async function loadLogs() {
     button.disabled = false;
   }
 }
+$("#media-storage-diagnose").addEventListener("click", runBackblazeDiagnostic);
 $("#audit-refresh").addEventListener("click", loadLogs);
 $("#audit-search").addEventListener("input", applySearch);
 void loadLogs();
