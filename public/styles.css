@@ -357,3 +357,6 @@ html[data-accent-theme="berry"] { --accent: #D778A5; --navy: #853456; --accent-i
 .media-open-link { flex: 0 0 auto; color: var(--navy); font-weight: 700; text-decoration: none; }
 .media-publish-button { justify-self: start; }
 .conductor-media-library .form-message { overflow-wrap: anywhere; }
+
+.media-diagnostic-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 8px; }
+.media-diagnostic-controls .form-message { flex: 1 1 320px; margin: 0; overflow-wrap: anywhere; }

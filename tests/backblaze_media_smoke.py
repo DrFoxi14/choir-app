@@ -28,6 +28,7 @@ assert "asset.status" not in catalog
 # All upload and download routes require an authenticated session plus conductor/member policy checks.
 for route in [
     '"/api/conductor/media/status"',
+    '"/api/conductor/media/diagnose"',
     '"/api/conductor/songs"',
     '"/api/conductor/assets/complete"',
 ]:
@@ -44,7 +45,8 @@ for element in [
     'id="media-song-create-form"', 'id="media-upload-form"',
     'id="media-song-select"', 'id="media-voice-select"',
     'id="media-format-select"', 'id="media-file-input"',
-    'id="media-song-list"', 'id="media-storage-status"'
+    'id="media-song-list"', 'id="media-storage-status"',
+    'id="media-storage-diagnose"', 'id="media-diagnose-message"'
 ]:
     assert element in home, f"Missing media UI element {element}"
 assert 'method: "PUT"' in app
@@ -55,4 +57,16 @@ assert '"/api/conductor/songs/" + encodeURIComponent(song.id) + "/publish"' in a
 assert "CREATE TABLE IF NOT EXISTS media_uploads" in migration
 assert "ALTER TABLE song_assets ADD COLUMN file_name TEXT" in migration
 assert "UNIQUE" in migration and "expires_at" in migration
+
+# Diagnostics compare a signed missing-object response with the real S3 CORS preflight.
+assert 'async function diagnoseMediaStorage' in worker
+assert '"Access-Control-Request-Method": "PUT"' in worker
+assert '"Access-Control-Request-Headers": "content-type"' in worker
+assert 'Access-Control-Allow-Origin' in worker
+assert 'Access-Control-Allow-Methods' in worker
+assert 'Access-Control-Allow-Headers' in worker
+assert '"/api/conductor/media/diagnose"' in app
+assert 'Testează conexiunea B2' in home
+assert 'Browserul nu a putut citi răspunsul Backblaze' in app
+
 print("Backblaze media smoke test passed: signed URLs, access checks, catalog privacy, and upload UI.")

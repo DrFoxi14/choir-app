@@ -229,6 +229,32 @@ function renderConductorMediaSongs() {
     addText(container, "p", "muted compact", "Nu există încă nicio cântare. Creează una mai sus.");
   }
 }
+async function runBackblazeDiagnostic() {
+  const button = $("#media-storage-diagnose");
+  button.disabled = true;
+  setMessage("#media-diagnose-message", "Se testează semnătura și preflight-ul CORS…");
+  try {
+    const result = await requestJSON("/api/conductor/media/diagnose");
+    const signature = result.signature || {};
+    const cors = result.cors || {};
+    const parts = [
+      "Semnătură: " + (signature.ok ? "OK" : "EȘEC") +
+        " (HTTP " + signature.status + (signature.code ? ", " + signature.code : "") + ").",
+      "CORS: " + (cors.ok ? "OK" : "EȘEC") +
+        " (HTTP " + cors.status + (cors.code ? ", " + cors.code : "") + ").",
+      cors.allowOrigin ? "Allow-Origin: " + cors.allowOrigin + "." : "Allow-Origin: lipsește.",
+      cors.allowMethods ? "Allow-Methods: " + cors.allowMethods + "." : "Allow-Methods: lipsește.",
+      cors.allowHeaders ? "Allow-Headers: " + cors.allowHeaders + "." : "Allow-Headers: lipsește."
+    ];
+    setMessage("#media-diagnose-message", parts.join(" "), signature.ok && cors.ok ? "success" : "error");
+  } catch (error) {
+    setMessage("#media-diagnose-message", error.message, "error");
+  } finally {
+    button.disabled = false;
+  }
+}
+$("#media-storage-diagnose").addEventListener("click", runBackblazeDiagnostic);
+
 async function loadConductorMedia() {
   try {
     const data = await requestJSON("/api/conductor/songs");
@@ -297,7 +323,7 @@ $("#media-upload-form").addEventListener("submit", async (event) => {
         body: file
       });
     } catch {
-      throw new Error("Încărcarea directă a eșuat. Verifică politica CORS a bucket-ului Backblaze pentru https://cor.tabororadea.workers.dev și încearcă din nou.");
+      throw new Error("Browserul nu a putut citi răspunsul Backblaze. Poate fi preflight CORS, o semnătură respinsă sau o problemă de rețea. Apasă „Testează conexiunea B2” în Biblioteca de fișiere pentru a separa cauzele.");
     }
     if (!uploadResponse.ok) {
       throw new Error("Backblaze a respins fișierul (HTTP " + uploadResponse.status + "). Verifică CORS și permisiunile cheii pentru bucket.");
