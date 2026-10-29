@@ -28,8 +28,8 @@ audit_start = download.index('await recordAudit')
 audit_end = download.index('return new Response', audit_start)
 audit = download[audit_start:audit_end]
 assert '"media.asset.download_link_issued"' in audit
-assert '"format": asset.format' in audit
-assert '"voicePart": asset.voicePart' in audit
+assert "format: asset.format" in audit
+assert "voicePart: asset.voicePart" in audit
 assert "signedUrl" not in audit, "Signed URLs must not be audited"
 assert "objectKey" not in audit, "Private object keys must not be audited"
 diagnostic_start = worker.index("async function diagnoseMediaStorage(")
