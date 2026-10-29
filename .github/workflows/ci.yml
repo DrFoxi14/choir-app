@@ -50,5 +50,8 @@ jobs:
       - name: Smoke-test account and attendance routes
         run: python3 tests/account_attendance_routes_smoke.py
 
+      - name: Smoke-test Backblaze media integration
+        run: python3 tests/backblaze_media_smoke.py
+
       - name: Smoke-test one-paste Preview D1 bootstrap
         run: python3 tests/preview_d1_bootstrap_smoke.py

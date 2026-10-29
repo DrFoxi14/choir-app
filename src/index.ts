@@ -26,6 +26,11 @@ interface Env {
   DEFAULT_CHOIR_SLUG?: string;
   AUTH_SECRET?: string;
   BOOTSTRAP_SETUP_KEY?: string;
+  B2_ENDPOINT?: string;
+  B2_REGION?: string;
+  B2_BUCKET?: string;
+  B2_KEY_ID?: string;
+  B2_APP_KEY?: string;
 }
 interface ChoirRow { id: string; slug: string; name: string; }
 interface SessionRow {
@@ -812,13 +817,144 @@ async function requireSession(request: Request, env: Env): Promise<SessionRow | 
 function isConductor(session: SessionRow): boolean {
   return session.role === "conductor" || session.role === "owner";
 }
+type MediaFormat = "pdf" | "audio" | "video";
+type MediaVoice = typeof VOICE_PARTS[number];
+interface B2Config {
+  endpoint: URL;
+  bucket: string;
+  region: string;
+  keyId: string;
+  applicationKey: string;
+}
+interface MediaExtension {
+  format: MediaFormat;
+  contentType: string;
+  maxBytes: number;
+}
+const MEDIA_EXTENSIONS: Record<string, MediaExtension> = {
+  pdf: { format: "pdf", contentType: "application/pdf", maxBytes: 50 * 1024 * 1024 },
+  mp3: { format: "audio", contentType: "audio/mpeg", maxBytes: 500 * 1024 * 1024 },
+  m4a: { format: "audio", contentType: "audio/mp4", maxBytes: 500 * 1024 * 1024 },
+  aac: { format: "audio", contentType: "audio/aac", maxBytes: 500 * 1024 * 1024 },
+  wav: { format: "audio", contentType: "audio/wav", maxBytes: 500 * 1024 * 1024 },
+  ogg: { format: "audio", contentType: "audio/ogg", maxBytes: 500 * 1024 * 1024 },
+  opus: { format: "audio", contentType: "audio/opus", maxBytes: 500 * 1024 * 1024 },
+  flac: { format: "audio", contentType: "audio/flac", maxBytes: 500 * 1024 * 1024 },
+  mp4: { format: "video", contentType: "video/mp4", maxBytes: 2 * 1024 * 1024 * 1024 },
+  webm: { format: "video", contentType: "video/webm", maxBytes: 2 * 1024 * 1024 * 1024 },
+  mov: { format: "video", contentType: "video/quicktime", maxBytes: 2 * 1024 * 1024 * 1024 }
+};
+function getB2Config(env: Env): B2Config | null {
+  if (!env.B2_ENDPOINT || !env.B2_REGION || !env.B2_BUCKET || !env.B2_KEY_ID || !env.B2_APP_KEY) {
+    return null;
+  }
+  try {
+    const endpoint = new URL(env.B2_ENDPOINT);
+    const region = env.B2_REGION.trim();
+    const bucket = env.B2_BUCKET.trim();
+    if (endpoint.protocol !== "https:" || endpoint.pathname !== "/" ||
+        endpoint.search || endpoint.hash || endpoint.username || endpoint.password ||
+        !/^[a-z0-9-]+$/.test(region) ||
+        endpoint.hostname !== "s3." + region + ".backblazeb2.com" ||
+        !/^[a-z0-9-]{3,63}$/.test(bucket)) {
+      return null;
+    }
+    return {
+      endpoint,
+      bucket,
+      region,
+      keyId: env.B2_KEY_ID,
+      applicationKey: env.B2_APP_KEY
+    };
+  } catch {
+    return null;
+  }
+}
+function awsEncode(value: string): string {
+  return encodeURIComponent(value).replace(/[!'()*]/g, (char) =>
+    "%" + char.charCodeAt(0).toString(16).toUpperCase()
+  );
+}
+function toHex(bytes: Uint8Array): string {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+async function hmacBytes(keyMaterial: string | Uint8Array, value: string): Promise<Uint8Array> {
+  const keyBytes = typeof keyMaterial === "string" ? encoder.encode(keyMaterial) : keyMaterial;
+  const keyBuffer = new ArrayBuffer(keyBytes.byteLength);
+  new Uint8Array(keyBuffer).set(keyBytes);
+  const key = await crypto.subtle.importKey(
+    "raw", keyBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const valueBytes = encoder.encode(value);
+  const valueBuffer = new ArrayBuffer(valueBytes.byteLength);
+  new Uint8Array(valueBuffer).set(valueBytes);
+  const digest = await crypto.subtle.sign("HMAC", key, valueBuffer);
+  return new Uint8Array(digest);
+}
+async function sha256Hex(value: string): Promise<string> {
+  const digest = await crypto.subtle.digest("SHA-256", encoder.encode(value));
+  return toHex(new Uint8Array(digest));
+}
+async function presignB2Object(
+  config: B2Config,
+  method: "GET" | "PUT" | "HEAD",
+  objectKey: string,
+  expiresSeconds: number,
+  contentType?: string
+): Promise<string> {
+  const safeExpiry = Math.max(1, Math.min(Math.trunc(expiresSeconds), 3600));
+  const amzDate = new Date().toISOString().replace(/[:-]|\.\d{3}/g, "");
+  const dateStamp = amzDate.slice(0, 8);
+  const scope = dateStamp + "/" + config.region + "/s3/aws4_request";
+  const signedHeaders = contentType ? "content-type;host" : "host";
+  const canonicalHeaders = contentType
+    ? "content-type:" + contentType + "\nhost:" + config.endpoint.host + "\n"
+    : "host:" + config.endpoint.host + "\n";
+  const canonicalUri = "/" + awsEncode(config.bucket) + "/" +
+    objectKey.split("/").map(awsEncode).join("/");
+  const queryValues: Array<[string, string]> = [
+    ["X-Amz-Algorithm", "AWS4-HMAC-SHA256"],
+    ["X-Amz-Credential", config.keyId + "/" + scope],
+    ["X-Amz-Date", amzDate],
+    ["X-Amz-Expires", String(safeExpiry)],
+    ["X-Amz-SignedHeaders", signedHeaders]
+  ];
+  const canonicalQuery = queryValues
+    .sort(([a], [b]) => a < b ? -1 : a > b ? 1 : 0)
+    .map(([key, value]) => awsEncode(key) + "=" + awsEncode(value))
+    .join("&");
+  const canonicalRequest = [
+    method,
+    canonicalUri,
+    canonicalQuery,
+    canonicalHeaders,
+    signedHeaders,
+    "UNSIGNED-PAYLOAD"
+  ].join("\n");
+  const stringToSign = "AWS4-HMAC-SHA256\n" + amzDate + "\n" + scope + "\n" +
+    await sha256Hex(canonicalRequest);
+  const dateKey = await hmacBytes("AWS4" + config.applicationKey, dateStamp);
+  const regionKey = await hmacBytes(dateKey, config.region);
+  const serviceKey = await hmacBytes(regionKey, "s3");
+  const signingKey = await hmacBytes(serviceKey, "aws4_request");
+  const signature = toHex(await hmacBytes(signingKey, stringToSign));
+  return config.endpoint.origin + canonicalUri + "?" + canonicalQuery +
+    "&X-Amz-Signature=" + signature;
+}
+function safeUploadFileName(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const leaf = value.replace(/\\/g, "/").split("/").pop() ?? "";
+  const cleaned = leaf.replace(/[\u0000-\u001f\u007f]/g, "").trim();
+  if (!cleaned || cleaned.length > 180 || cleaned === "." || cleaned === "..") return null;
+  return cleaned;
+}
 async function listSongs(request: Request, env: Env): Promise<Response> {
   const current = await requireSession(request, env);
   if (current instanceof Response) return current;
   if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
   const url = new URL(request.url);
   const requestedVoice = url.searchParams.get("voice");
-  let voice: VoicePart;
+  let voice: MediaVoice;
   if (current.role === "member") {
     if (!isVoicePart(current.voicePart)) return fail("voice_not_assigned", "Dirijorul trebuie să-ți asocieze o voce.", 403);
     voice = current.voicePart;
@@ -826,12 +962,299 @@ async function listSongs(request: Request, env: Env): Promise<Response> {
     voice = isVoicePart(requestedVoice) ? requestedVoice : (isVoicePart(current.voicePart) ? current.voicePart : "S");
   }
   const result = await env.DB.prepare(
-    "SELECT s.id, s.title, s.slug, s.description, s.sort_order FROM songs s " +
+    "SELECT s.id, s.title, s.slug, s.description, s.sort_order AS sortOrder FROM songs s " +
     "WHERE s.choir_id = ? AND s.status = 'published' " +
     "ORDER BY s.sort_order ASC, s.title COLLATE NOCASE ASC"
-  ).bind(current.choirId).all();
-  // Asset keys and storage URLs are intentionally never exposed by the catalog API.
-  return json({ songs: result.results ?? [], voice });
+  ).bind(current.choirId).all<{ id: string; title: string; slug: string; description: string | null; sortOrder: number }>();
+  const songs = result.results ?? [];
+  if (!songs.length) return json({ songs: [], voice });
+  const placeholders = songs.map(() => "?").join(", ");
+  const assetsResult = await env.DB.prepare(
+    "SELECT id, song_id AS songId, voice_part AS voicePart, format FROM song_assets " +
+    "WHERE choir_id = ? AND status = 'published' AND voice_part = ? " +
+    "AND song_id IN (" + placeholders + ") ORDER BY updated_at DESC"
+  ).bind(current.choirId, voice, ...songs.map((song) => song.id))
+    .all<{ id: string; songId: string; voicePart: MediaVoice; format: MediaFormat }>();
+  const assetsBySong = new Map<string, Array<{ id: string; voicePart: MediaVoice; format: MediaFormat }>>();
+  for (const asset of assetsResult.results ?? []) {
+    const list = assetsBySong.get(asset.songId) ?? [];
+    list.push({ id: asset.id, voicePart: asset.voicePart, format: asset.format });
+    assetsBySong.set(asset.songId, list);
+  }
+  return json({
+    songs: songs.map((song) => ({ ...song, assets: assetsBySong.get(song.id) ?? [] })),
+    voice
+  });
+}
+async function listConductorSongs(request: Request, env: Env): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot administra fișierele repertoriului.", 403);
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const [songResult, assetResult] = await Promise.all([
+    env.DB.prepare(
+      "SELECT id, title, slug, description, status, sort_order AS sortOrder " +
+      "FROM songs WHERE choir_id = ? ORDER BY sort_order ASC, title COLLATE NOCASE ASC"
+    ).bind(current.choirId).all<{ id: string; title: string; slug: string; description: string | null; status: string; sortOrder: number }>(),
+    env.DB.prepare(
+      "SELECT id, song_id AS songId, voice_part AS voicePart, format, status, file_name AS fileName, size_bytes AS sizeBytes " +
+      "FROM song_assets WHERE choir_id = ? AND status != 'archived' ORDER BY created_at DESC"
+    ).bind(current.choirId).all<{ id: string; songId: string; voicePart: MediaVoice; format: MediaFormat; status: string; fileName: string | null; sizeBytes: number | null }>()
+  ]);
+  const assetsBySong = new Map<string, Array<Record<string, unknown>>>();
+  for (const asset of assetResult.results ?? []) {
+    const list = assetsBySong.get(asset.songId) ?? [];
+    list.push({
+      id: asset.id,
+      voicePart: asset.voicePart,
+      format: asset.format,
+      status: asset.status,
+      fileName: asset.fileName,
+      sizeBytes: asset.sizeBytes
+    });
+    assetsBySong.set(asset.songId, list);
+  }
+  return json({
+    configured: Boolean(getB2Config(env)),
+    songs: (songResult.results ?? []).map((song) => ({
+      ...song,
+      assets: assetsBySong.get(song.id) ?? []
+    }))
+  });
+}
+async function getMediaStorageStatus(request: Request, env: Env): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot consulta starea stocării.", 403);
+  return json({ configured: Boolean(getB2Config(env)) });
+}
+async function createSong(request: Request, env: Env): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot adăuga cântări.", 403);
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const body = await readJson(request, 8192);
+  if (!body || typeof body.title !== "string" || typeof body.description !== "string") {
+    return fail("invalid_song", "Completează titlul și descrierea cântării.", 400);
+  }
+  const title = body.title.trim().replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ");
+  const description = body.description.trim().replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ");
+  if (!title || title.length > 160 || description.length > 1200) {
+    return fail("invalid_song", "Titlul trebuie să aibă 1–160 de caractere, iar descrierea maximum 1200.", 400);
+  }
+  const slugBase = title.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 54) || "cantare";
+  const id = crypto.randomUUID();
+  const slug = slugBase + "-" + id.slice(0, 8);
+  const sort = await env.DB.prepare(
+    "SELECT COALESCE(MAX(sort_order), 0) + 1 AS nextOrder FROM songs WHERE choir_id = ?"
+  ).bind(current.choirId).all<{ nextOrder: number }>();
+  await env.DB.prepare(
+    "INSERT INTO songs (id, choir_id, title, slug, description, status, sort_order, created_by_user_id) " +
+    "VALUES (?, ?, ?, ?, ?, 'draft', ?, ?)"
+  ).bind(id, current.choirId, title, slug, description || null, sort.results?.[0]?.nextOrder ?? 1, current.userId).run();
+  await recordAudit(env, current.choirId, current.userId, "conductor.song.created", "song", id, { title });
+  return json({ song: { id, title, slug, description: description || null, status: "draft", assets: [] }, message: "Cântarea a fost creată ca draft. Încarcă fișierele, apoi public-o." }, 201);
+}
+async function publishSong(request: Request, env: Env, songId: string): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot publica repertoriul.", 403);
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const found = await env.DB.prepare(
+    "SELECT id, title, status FROM songs WHERE id = ? AND choir_id = ? LIMIT 1"
+  ).bind(songId, current.choirId).all<{ id: string; title: string; status: string }>();
+  const song = found.results?.[0];
+  if (!song) return fail("song_not_found", "Cântarea nu a fost găsită.", 404);
+  if (song.status === "archived") return fail("song_archived", "Cântarea este arhivată și nu poate fi publicată.", 409);
+  const assets = await env.DB.prepare(
+    "SELECT id FROM song_assets WHERE choir_id = ? AND song_id = ? AND status IN ('draft', 'published') LIMIT 1"
+  ).bind(current.choirId, songId).all<{ id: string }>();
+  if (!assets.results?.length) return fail("song_has_no_assets", "Înainte de publicare, încarcă cel puțin un fișier.", 409);
+  const now = new Date().toISOString();
+  await env.DB.batch([
+    env.DB.prepare("UPDATE songs SET status = 'published', updated_at = ? WHERE id = ? AND choir_id = ?")
+      .bind(now, songId, current.choirId),
+    env.DB.prepare("UPDATE song_assets SET status = 'published', updated_at = ? WHERE song_id = ? AND choir_id = ? AND status = 'draft'")
+      .bind(now, songId, current.choirId)
+  ]);
+  await recordAudit(env, current.choirId, current.userId, "conductor.song.published", "song", songId, { title: song.title });
+  return json({ message: "Cântarea și fișierele ei sunt publicate pentru vocile asociate." });
+}
+async function prepareMediaUpload(request: Request, env: Env, songId: string): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot încărca fișiere.", 403);
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const config = getB2Config(env);
+  if (!config) return fail("backblaze_not_configured", "Backblaze B2 nu este configurat încă pe server.", 503);
+  const body = await readJson(request, 4096);
+  if (!body || !isVoicePart(body.voicePart) ||
+      (body.format !== "pdf" && body.format !== "audio" && body.format !== "video") ||
+      typeof body.sizeBytes !== "number" || !Number.isSafeInteger(body.sizeBytes) || body.sizeBytes <= 0) {
+    return fail("invalid_media_upload", "Verifică vocea, formatul și dimensiunea fișierului.", 400);
+  }
+  const fileName = safeUploadFileName(body.fileName);
+  if (!fileName) return fail("invalid_media_filename", "Numele fișierului nu este valid.", 400);
+  const extension = fileName.includes(".") ? fileName.split(".").pop()!.toLowerCase() : "";
+  const media = MEDIA_EXTENSIONS[extension];
+  if (!media || media.format !== body.format) {
+    return fail("unsupported_media_type", "Format nesuportat. PDF: .pdf; audio: .mp3, .m4a, .aac, .wav, .ogg, .opus, .flac; video: .mp4, .webm sau .mov.", 415);
+  }
+  if (body.sizeBytes > media.maxBytes) {
+    return fail("media_too_large", "Fișierul depășește limita pentru acest format (" + Math.floor(media.maxBytes / (1024 * 1024)) + " MB).", 413);
+  }
+  const songResult = await env.DB.prepare(
+    "SELECT id, status FROM songs WHERE id = ? AND choir_id = ? LIMIT 1"
+  ).bind(songId, current.choirId).all<{ id: string; status: string }>();
+  const song = songResult.results?.[0];
+  if (!song) return fail("song_not_found", "Cântarea nu a fost găsită.", 404);
+  if (song.status === "archived") return fail("song_archived", "Nu poți încărca fișiere într-o cântare arhivată.", 409);
+
+  const uploadId = crypto.randomUUID();
+  const objectKey = current.choirId + "/" + songId + "/" + uploadId + "." + extension;
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + 15 * 60 * 1000).toISOString();
+  await env.DB.prepare(
+    "INSERT INTO media_uploads (id, choir_id, song_id, created_by_user_id, object_key, voice_part, format, file_name, content_type, size_bytes, status, expires_at) " +
+    "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)"
+  ).bind(uploadId, current.choirId, songId, current.userId, objectKey, body.voicePart, body.format,
+    fileName, media.contentType, body.sizeBytes, expiresAt).run();
+  const uploadUrl = await presignB2Object(config, "PUT", objectKey, 900, media.contentType);
+  await recordAudit(env, current.choirId, current.userId, "conductor.media.upload_started", "media_upload", uploadId, {
+    songId, voicePart: body.voicePart, format: body.format, sizeBytes: body.sizeBytes
+  });
+  return json({
+    uploadId,
+    uploadUrl,
+    method: "PUT",
+    contentType: media.contentType,
+    expiresAt,
+    message: "URL de încărcare generat. Încarcă fișierul înainte să expire în 15 minute."
+  }, 201);
+}
+async function completeMediaUpload(request: Request, env: Env): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!isConductor(current)) return fail("forbidden", "Doar dirijorii pot confirma încărcarea fișierelor.", 403);
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const config = getB2Config(env);
+  if (!config) return fail("backblaze_not_configured", "Backblaze B2 nu este configurat încă pe server.", 503);
+  const body = await readJson(request);
+  if (!body || typeof body.uploadId !== "string" ||
+      !/^[a-f0-9-]{36}$/i.test(body.uploadId)) {
+    return fail("invalid_upload_id", "Identificatorul încărcării nu este valid.", 400);
+  }
+  const uploadResult = await env.DB.prepare(
+    "SELECT u.id, u.choir_id AS choirId, u.song_id AS songId, u.created_by_user_id AS createdByUserId, " +
+    "u.object_key AS objectKey, u.voice_part AS voicePart, u.format, u.file_name AS fileName, " +
+    "u.content_type AS contentType, u.size_bytes AS sizeBytes, u.status, u.expires_at AS expiresAt, s.status AS songStatus " +
+    "FROM media_uploads u JOIN songs s ON s.id = u.song_id AND s.choir_id = u.choir_id " +
+    "WHERE u.id = ? AND u.choir_id = ? LIMIT 1"
+  ).bind(body.uploadId, current.choirId).all<{
+    id: string; choirId: string; songId: string; createdByUserId: string; objectKey: string;
+    voicePart: MediaVoice; format: MediaFormat; fileName: string; contentType: string;
+    sizeBytes: number; status: string; expiresAt: string; songStatus: string;
+  }>();
+  const upload = uploadResult.results?.[0];
+  if (!upload || upload.createdByUserId !== current.userId) {
+    return fail("upload_not_found", "Încărcarea nu a fost găsită.", 404);
+  }
+  if (upload.status === "completed") {
+    const asset = await env.DB.prepare("SELECT id, status FROM song_assets WHERE object_key = ? AND choir_id = ? LIMIT 1")
+      .bind(upload.objectKey, current.choirId).all<{ id: string; status: string }>();
+    if (asset.results?.[0]) return json({ assetId: asset.results[0].id, status: asset.results[0].status, message: "Fișierul este deja înregistrat." });
+    return fail("upload_already_completed", "Încărcarea a fost deja finalizată.", 409);
+  }
+  if (upload.status !== "pending" || upload.expiresAt <= new Date().toISOString()) {
+    await env.DB.prepare("UPDATE media_uploads SET status = 'expired' WHERE id = ? AND status = 'pending'")
+      .bind(upload.id).run();
+    return fail("upload_expired", "URL-ul de încărcare a expirat. Începe încărcarea din nou.", 410);
+  }
+  if (upload.songStatus === "archived") return fail("song_archived", "Cântarea a fost arhivată.", 409);
+  const headUrl = await presignB2Object(config, "HEAD", upload.objectKey, 60);
+  let headResponse: Response;
+  try {
+    headResponse = await fetch(headUrl, { method: "HEAD" });
+  } catch {
+    return fail("backblaze_unreachable", "Nu am putut verifica fișierul în Backblaze. Încearcă din nou.", 502);
+  }
+  if (headResponse.status === 404 || headResponse.status === 403) {
+    return fail("uploaded_file_not_found", "Fișierul nu a fost găsit în Backblaze. Verifică dacă încărcarea s-a terminat.", 422);
+  }
+  if (!headResponse.ok) {
+    return fail("backblaze_head_failed", "Backblaze nu a putut valida fișierul încărcat.", 502);
+  }
+  const storedSize = Number(headResponse.headers.get("Content-Length") || 0);
+  const storedType = (headResponse.headers.get("Content-Type") || "").split(";")[0].trim().toLowerCase();
+  if (storedSize !== upload.sizeBytes || storedType !== upload.contentType.toLowerCase()) {
+    return fail("uploaded_file_mismatch", "Dimensiunea sau tipul fișierului încărcat nu corespunde cererii.", 422);
+  }
+  const assetId = crypto.randomUUID();
+  const now = new Date().toISOString();
+  const batchResults = await env.DB.batch([
+    env.DB.prepare(
+      "INSERT INTO song_assets (id, choir_id, song_id, voice_part, format, object_key, content_type, size_bytes, status, file_name, created_at, updated_at) " +
+      "SELECT ?, u.choir_id, u.song_id, u.voice_part, u.format, u.object_key, u.content_type, u.size_bytes, " +
+      "CASE WHEN s.status = 'published' THEN 'published' ELSE 'draft' END, u.file_name, ?, ? " +
+      "FROM media_uploads u JOIN songs s ON s.id = u.song_id AND s.choir_id = u.choir_id " +
+      "WHERE u.id = ? AND u.status = 'pending' AND u.expires_at > ? AND u.created_by_user_id = ?"
+    ).bind(assetId, now, now, upload.id, now, current.userId),
+    env.DB.prepare(
+      "UPDATE media_uploads SET status = 'completed', completed_at = ? WHERE id = ? AND status = 'pending' " +
+      "AND EXISTS (SELECT 1 FROM song_assets WHERE id = ? AND object_key = media_uploads.object_key)"
+    ).bind(now, upload.id, assetId)
+  ]);
+  if (Number(batchResults[0]?.meta?.changes ?? 0) !== 1 || Number(batchResults[1]?.meta?.changes ?? 0) !== 1) {
+    const already = await env.DB.prepare("SELECT id, status FROM song_assets WHERE object_key = ? AND choir_id = ? LIMIT 1")
+      .bind(upload.objectKey, current.choirId).all<{ id: string; status: string }>();
+    if (already.results?.[0]) return json({ assetId: already.results[0].id, status: already.results[0].status, message: "Fișierul este deja înregistrat." });
+    return fail("upload_completion_conflict", "Încărcarea a expirat sau a fost finalizată într-o altă cerere.", 409);
+  }
+  await env.DB.prepare(
+    "UPDATE song_assets SET status = 'archived', updated_at = ? WHERE choir_id = ? AND song_id = ? " +
+    "AND voice_part = ? AND format = ? AND id != ? AND status IN ('draft', 'published')"
+  ).bind(now, current.choirId, upload.songId, upload.voicePart, upload.format, assetId).run();
+  await recordAudit(env, current.choirId, current.userId, "conductor.media.upload_completed", "song_asset", assetId, {
+    songId: upload.songId, voicePart: upload.voicePart, format: upload.format, sizeBytes: storedSize
+  });
+  return json({
+    assetId,
+    status: upload.songStatus === "published" ? "published" : "draft",
+    message: upload.songStatus === "published"
+      ? "Fișierul a fost încărcat și publicat."
+      : "Fișierul a fost încărcat. Publică apoi cântarea ca să-l vadă membrii."
+  }, 201);
+}
+async function downloadSongAsset(request: Request, env: Env, assetId: string): Promise<Response> {
+  const current = await requireSession(request, env);
+  if (current instanceof Response) return current;
+  if (!env.DB) return fail("database_not_configured", "Baza de date nu este configurată.", 503);
+  const config = getB2Config(env);
+  if (!config) return fail("backblaze_not_configured", "Backblaze B2 nu este configurat încă pe server.", 503);
+  const assetResult = await env.DB.prepare(
+    "SELECT a.id, a.object_key AS objectKey, a.status AS assetStatus, a.voice_part AS voicePart, " +
+    "s.status AS songStatus FROM song_assets a JOIN songs s ON s.id = a.song_id AND s.choir_id = a.choir_id " +
+    "WHERE a.id = ? AND a.choir_id = ? LIMIT 1"
+  ).bind(assetId, current.choirId).all<{ id: string; objectKey: string; assetStatus: string; voicePart: MediaVoice; songStatus: string }>();
+  const asset = assetResult.results?.[0];
+  if (!asset || asset.assetStatus === "archived" || asset.songStatus === "archived") {
+    return fail("asset_not_found", "Fișierul nu a fost găsit.", 404);
+  }
+  if (current.role === "member" &&
+      (asset.assetStatus !== "published" || asset.songStatus !== "published" || asset.voicePart !== current.voicePart)) {
+    return fail("asset_not_found", "Fișierul nu este disponibil pentru contul tău.", 404);
+  }
+  const signedUrl = await presignB2Object(config, "GET", asset.objectKey, 3600);
+  return new Response(null, {
+    status: 302,
+    headers: {
+      "Location": signedUrl,
+      "Cache-Control": "no-store, max-age=0",
+      "Referrer-Policy": "no-referrer",
+      "X-Content-Type-Options": "nosniff"
+    }
+  });
 }
 async function listMemberContacts(request: Request, env: Env): Promise<Response> {
   const current = await requireSession(request, env);
@@ -1261,7 +1684,17 @@ async function handleApi(request: Request, env: Env): Promise<Response> {
   if (request.method === "POST" && path === "/api/account/phone") return updateAccountPhone(request, env);
   if (request.method === "POST" && path === "/api/account/preferences") return saveAccountPreferences(request, env);
   if (request.method === "POST" && path === "/api/conductor/attendance") return saveAttendance(request, env);
+  if (request.method === "GET" && path === "/api/conductor/media/status") return getMediaStorageStatus(request, env);
+  if (request.method === "GET" && path === "/api/conductor/songs") return listConductorSongs(request, env);
+  if (request.method === "POST" && path === "/api/conductor/songs") return createSong(request, env);
+  if (request.method === "POST" && path === "/api/conductor/assets/complete") return completeMediaUpload(request, env);
   if (request.method === "GET" && path === "/api/songs") return listSongs(request, env);
+  const songPublishMatch = path.match(/^\/api\/conductor\/songs\/([a-f0-9-]{36})\/publish$/);
+  if (request.method === "POST" && songPublishMatch) return publishSong(request, env, songPublishMatch[1]);
+  const songUploadMatch = path.match(/^\/api\/conductor\/songs\/([a-f0-9-]{36})\/assets\/upload-url$/);
+  if (request.method === "POST" && songUploadMatch) return prepareMediaUpload(request, env, songUploadMatch[1]);
+  const assetDownloadMatch = path.match(/^\/api\/assets\/([a-f0-9-]{36})\/download$/);
+  if (request.method === "GET" && assetDownloadMatch) return downloadSongAsset(request, env, assetDownloadMatch[1]);
   if (request.method === "GET" && path === "/api/conductor/members") return listMembers(request, env);
   if (request.method === "POST" && path === "/api/conductor/contacts") return listMemberContacts(request, env);
   if (request.method === "GET" && path === "/api/conductor/invitations") return listInvitations(request, env);

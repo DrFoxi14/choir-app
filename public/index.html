@@ -172,6 +172,60 @@
         </div>
       </section>
 
+      <section class="panel dashboard-section conductor-media-library" aria-labelledby="conductor-media-title">
+        <h3 id="conductor-media-title">Biblioteca de fișiere</h3>
+        <p class="muted compact">Creează cântări, încarcă partituri PDF, audio și video în Backblaze B2, apoi publică materialele pentru membrii corului. Fișierele sunt încărcate direct din browser, iar cheia de stocare rămâne pe server.</p>
+        <p id="media-storage-status" class="form-message" role="status">Se verifică stocarea…</p>
+
+        <form id="media-song-create-form" class="form-stack media-song-create-form">
+          <h4>Cântare nouă</h4>
+          <label for="media-song-title">Titlu</label>
+          <input id="media-song-title" name="title" maxlength="160" required placeholder="Titlul cântării">
+          <label for="media-song-description">Descriere (opțional)</label>
+          <textarea id="media-song-description" name="description" maxlength="1200" rows="2" placeholder="Detalii pentru cor"></textarea>
+          <button class="primary-button" type="submit">Creează cântarea ca draft</button>
+          <p id="media-song-create-message" class="form-message" role="status"></p>
+        </form>
+
+        <hr class="section-divider">
+        <form id="media-upload-form" class="form-stack">
+          <h4>Încarcă un fișier</h4>
+          <label for="media-song-select">Cântare</label>
+          <select id="media-song-select" name="songId" required>
+            <option value="">Alege o cântare</option>
+          </select>
+          <label for="media-voice-select">Voce</label>
+          <select id="media-voice-select" name="voicePart" required>
+            <option value="S">Sopran</option>
+            <option value="A">Alto</option>
+            <option value="T">Tenor</option>
+            <option value="B">Bas</option>
+          </select>
+          <label for="media-format-select">Tip fișier</label>
+          <select id="media-format-select" name="format" required>
+            <option value="pdf">Partitură PDF</option>
+            <option value="audio">Audio (MP3, M4A, AAC, WAV, OGG, OPUS, FLAC)</option>
+            <option value="video">Video (MP4, WebM, MOV)</option>
+          </select>
+          <label for="media-file-input">Fișier</label>
+          <input id="media-file-input" name="file" type="file" accept=".pdf,.mp3,.m4a,.aac,.wav,.ogg,.opus,.flac,.mp4,.webm,.mov" required>
+          <p class="muted compact">Limite: PDF 50 MB, audio 500 MB, video 2 GB. Încarcă un fișier pentru o singură voce și un singur tip o dată.</p>
+          <button class="primary-button" type="submit">Încarcă fișierul</button>
+          <p id="media-upload-message" class="form-message" role="status"></p>
+        </form>
+
+        <hr class="section-divider">
+        <div class="media-library-list">
+          <div class="attendance-roster-heading">
+            <h4>Cântările mele</h4>
+            <button id="media-library-reload" class="secondary-button" type="button">Reîncarcă</button>
+          </div>
+          <div id="media-song-list" class="media-song-list" aria-live="polite">
+            <p class="muted compact">Se încarcă biblioteca…</p>
+          </div>
+        </div>
+      </section>
+
       <section class="panel dashboard-section" aria-labelledby="conductor-catalog-title">
         <h3 id="conductor-catalog-title">Previzualizare repertoriu</h3>
         <label for="conductor-voice">Vezi repertoriul pentru vocea</label>
