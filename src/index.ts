@@ -1077,7 +1077,7 @@ async function diagnoseMediaStorage(request: Request, env: Env): Promise<Respons
       allowMethods = response.headers.get("Access-Control-Allow-Methods") ?? "";
       allowHeaders = response.headers.get("Access-Control-Allow-Headers") ?? "";
       const body = (await response.text()).slice(0, 3000);
-      code = body.match(/<Code>([^<]+)<\\/Code>/i)?.[1] ?? "";
+      code = body.match(/<Code>([^<]+)<\/Code>/i)?.[1] ?? "";
     } catch {
       code = "NetworkError";
     }
