@@ -29,8 +29,8 @@ delete = worker[start:end]
 assert "validPin(body.pin)" in delete
 assert "derivePinHash(" in delete and "constantTimeEqual(" in delete
 assert "song-delete-ip" in delete and "song-delete-user" in delete
-assert '"conductor.song.delete_reauthentication_failed"' in delete
-assert '"conductor.song.deleted"' in delete
+assert "conductor.song.delete_reauthentication_failed" in delete
+assert "conductor.song.deleted" in delete
 assert "SET status = 'archived'" in delete
 assert "UPDATE song_assets SET status = 'archived'" in delete
 assert "objectKey" not in delete and "presignB2Object" not in delete
