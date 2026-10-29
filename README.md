@@ -124,11 +124,11 @@ The current Worker name is **cor**, with the expected URL **https://cor.taborora
 
 ## Security and operational notes
 
-- The code in this branch needs a real browser/end-to-end security test before launch. CI checks the TypeScript, browser-JavaScript syntax, and database migration shape; it does not prove that the complete browser-to-Cloudflare flow works.
+- The code still needs a real browser/end-to-end security test before launch. CI checks TypeScript, browser-JavaScript syntax, database migration shape, and static security invariants for private media downloads; these checks do not prove that the complete browser-to-Cloudflare flow works.
 - Use a supported browser with HTTPS. All state-changing API endpoints require a same-origin Origin header.
 - Rate-limit buckets use keyed HMAC identifiers rather than storing raw client IP addresses or account codes.
 - Conductors can invite members. Only the owner can issue conductor invitations. Non-owner conductors cannot reset or replace another conductor's access codes.
 - `/invitation` is a dedicated conductor contacts/invitations page. Contact numbers are returned only from a conductor-only POST endpoint after re-entering the six-digit PIN, rate-limited and audited; regular catalog/list endpoints never return member phone numbers.
 - The `phone_verified_at` flag is stored per choir membership. An authorized conductor can set it only after re-entering their PIN; this is a manual confirmation, not verification by WhatsApp/SMS. WhatsApp links appear only when verified. Changing a member phone clears verification across the account's choir memberships.
-- Catalog queries are scoped to the resolved choir. Asset object keys and URLs are not returned by the API. Private media signing/streaming, file uploads, song publishing tools, additional monitoring, and end-to-end tests remain future work.
+- Catalog queries are scoped to the resolved choir. Asset object keys are not returned by catalog APIs; download redirects issue five-minute signed URLs and audit link issuance without storing signed URLs or object keys in audit metadata. Direct private B2 uploads, upload verification, and song publishing are implemented. Real browser end-to-end tests and operational monitoring remain future work.
 - Secrets, private access codes, real member information, and private media must never be committed to the repository.
