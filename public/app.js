@@ -10,7 +10,7 @@ const screens = {
   legal: $("#legal-acceptance-screen"),
   code: $("#credentials-notice")
 };
-const state = { user: null, issuedCode: "", pendingLegalUser: null };
+const state = { user: null, issuedCode: "", pendingLegalUser: null, mediaSongs: [] };
 
 async function requestJSON(path, method = "GET", body = undefined) {
   const headers = { Accept: "application/json" };
@@ -77,12 +77,22 @@ function addText(parent, tag, className, value) {
   parent.append(element);
   return element;
 }
-function makeAssetButton(label) {
-  const span = document.createElement("span");
-  span.className = "asset-link disabled";
-  span.textContent = label + " · indisponibil";
-  span.setAttribute("aria-label", label + " indisponibil");
-  return span;
+function makeAssetButton(label, asset) {
+  if (!asset) {
+    const span = document.createElement("span");
+    span.className = "asset-link disabled";
+    span.textContent = label + " · indisponibil";
+    span.setAttribute("aria-label", label + " indisponibil");
+    return span;
+  }
+  const link = document.createElement("a");
+  link.className = "asset-link";
+  link.textContent = label;
+  link.href = "/api/assets/" + encodeURIComponent(asset.id) + "/download";
+  link.target = "_blank";
+  link.rel = "noopener noreferrer";
+  link.setAttribute("aria-label", "Deschide " + label + " pentru această cântare");
+  return link;
 }
 function renderSongs(containerSelector, songs, voice) {
   const list = $(containerSelector);
@@ -93,9 +103,15 @@ function renderSongs(containerSelector, songs, voice) {
     card.className = "song-card";
     addText(card, "h3", "", song.title);
     if (song.description) addText(card, "p", "muted song-description", song.description);
+    const assets = Array.isArray(song.assets) ? song.assets : [];
+    const available = (format) => assets.find((asset) => asset.format === format && asset.voicePart === voice);
     const actions = document.createElement("div");
     actions.className = "asset-actions";
-    actions.append(makeAssetButton("PDF"), makeAssetButton("Audio"), makeAssetButton("Video"));
+    actions.append(
+      makeAssetButton("PDF", available("pdf")),
+      makeAssetButton("Audio", available("audio")),
+      makeAssetButton("Video", available("video"))
+    );
     card.append(actions);
     list.append(card);
   }
@@ -113,13 +129,192 @@ async function loadSongs(voice, conductor = false) {
       return;
     }
     setMessage(messageSelector, conductor
-      ? "Repertoriul pentru " + (voiceNames[voice] || voice) + ". Fișierele vor fi activate după configurarea livrării private."
-      : "Vocea ta: " + (voiceNames[data.voice] || voice) + ". Fișierele vor apărea după publicarea materialelor.");
+      ? "Repertoriul pentru " + (voiceNames[voice] || voice) + ". Deschide fișierele publicate pentru verificare."
+      : "Vocea ta: " + (voiceNames[data.voice] || voice) + ". Sunt disponibile numai materialele publicate pentru vocea ta.");
     renderSongs(listSelector, songs, data.voice || voice);
   } catch (error) {
     setMessage(messageSelector, error.message, "error");
   }
 }
+function mediaFormatName(format) {
+  return format === "pdf" ? "PDF" : format === "audio" ? "Audio" : "Video";
+}
+function formatFileSize(bytes) {
+  if (!Number.isFinite(Number(bytes)) || Number(bytes) <= 0) return "";
+  const value = Number(bytes);
+  if (value < 1024 * 1024) return Math.round(value / 1024) + " KB";
+  if (value < 1024 * 1024 * 1024) return (value / (1024 * 1024)).toFixed(1) + " MB";
+  return (value / (1024 * 1024 * 1024)).toFixed(2) + " GB";
+}
+function renderConductorMediaSongs() {
+  const container = $("#media-song-list");
+  const select = $("#media-song-select");
+  const selectedValue = select.value;
+  container.replaceChildren();
+  select.replaceChildren();
+  const placeholder = document.createElement("option");
+  placeholder.value = "";
+  placeholder.textContent = "Alege o cântare";
+  select.append(placeholder);
+  for (const song of state.mediaSongs) {
+    if (song.status !== "archived") {
+      const option = document.createElement("option");
+      option.value = song.id;
+      option.textContent = song.title + (song.status === "draft" ? " · draft" : "");
+      select.append(option);
+    }
+    const card = document.createElement("article");
+    card.className = "song-card media-song-card";
+    const heading = document.createElement("div");
+    heading.className = "media-song-heading";
+    addText(heading, "h4", "", song.title);
+    addText(heading, "span", "media-status " + (song.status === "published" ? "published" : song.status === "archived" ? "archived" : "draft"),
+      song.status === "published" ? "Publicată" : song.status === "archived" ? "Arhivată" : "Draft");
+    card.append(heading);
+    if (song.description) addText(card, "p", "muted compact", song.description);
+    const assets = Array.isArray(song.assets) ? song.assets : [];
+    if (assets.length) {
+      const items = document.createElement("div");
+      items.className = "media-asset-list";
+      for (const asset of assets) {
+        const row = document.createElement("div");
+        row.className = "media-asset-row";
+        const statusName = asset.status === "published" ? "publicat" : "draft";
+        const name = (voiceNames[asset.voicePart] || asset.voicePart) + " · " + mediaFormatName(asset.format) +
+          " · " + statusName + (asset.fileName ? " · " + asset.fileName : "") +
+          (asset.sizeBytes ? " · " + formatFileSize(asset.sizeBytes) : "");
+        addText(row, "span", "media-asset-name", name);
+        if (asset.status !== "archived") {
+          const open = document.createElement("a");
+          open.className = "media-open-link";
+          open.href = "/api/assets/" + encodeURIComponent(asset.id) + "/download";
+          open.target = "_blank";
+          open.rel = "noopener noreferrer";
+          open.textContent = "Deschide";
+          row.append(open);
+        }
+        items.append(row);
+      }
+      card.append(items);
+    } else {
+      addText(card, "p", "muted compact", "Niciun fișier încărcat.");
+    }
+    if (song.status === "draft") {
+      const publish = document.createElement("button");
+      publish.className = "secondary-button media-publish-button";
+      publish.type = "button";
+      publish.textContent = "Publică cântarea";
+      publish.disabled = assets.length === 0;
+      publish.addEventListener("click", async () => {
+        publish.disabled = true;
+        setMessage("#media-upload-message", "Se publică materialele…");
+        try {
+          const result = await requestJSON("/api/conductor/songs/" + encodeURIComponent(song.id) + "/publish", "POST", {});
+          setMessage("#media-upload-message", result.message || "Cântarea a fost publicată.", "success");
+          await loadConductorMedia();
+          await loadSongs($("#conductor-voice").value, true);
+        } catch (error) {
+          setMessage("#media-upload-message", error.message, "error");
+          publish.disabled = false;
+        }
+      });
+      card.append(publish);
+    }
+    container.append(card);
+  }
+  if (selectedValue && state.mediaSongs.some((song) => song.id === selectedValue && song.status !== "archived")) {
+    select.value = selectedValue;
+  }
+  if (!state.mediaSongs.length) {
+    addText(container, "p", "muted compact", "Nu există încă nicio cântare. Creează una mai sus.");
+  }
+}
+async function loadConductorMedia() {
+  try {
+    const data = await requestJSON("/api/conductor/songs");
+    state.mediaSongs = Array.isArray(data.songs) ? data.songs : [];
+    if (data.configured) {
+      setMessage("#media-storage-status", "Backblaze B2 este configurat. Fișierele se încarcă direct în bucket-ul privat.", "success");
+      $("#media-upload-form").querySelector('button[type="submit"]').disabled = false;
+    } else {
+      setMessage("#media-storage-status", "Backblaze B2 nu este configurat încă. Administratorul trebuie să adauge endpoint-ul, regiunea, bucket-ul și Application Key ca variabile/secrete în Cloudflare Workers.", "error");
+      $("#media-upload-form").querySelector('button[type="submit"]').disabled = true;
+    }
+    renderConductorMediaSongs();
+  } catch (error) {
+    setMessage("#media-storage-status", error.message, "error");
+    setMessage("#media-upload-message", "Nu am putut încărca biblioteca.", "error");
+  }
+}
+$("#media-library-reload").addEventListener("click", loadConductorMedia);
+$("#media-song-create-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  button.disabled = true;
+  setMessage("#media-song-create-message", "Se creează cântarea…");
+  try {
+    const result = await requestJSON("/api/conductor/songs", "POST", {
+      title: $("#media-song-title").value,
+      description: $("#media-song-description").value
+    });
+    form.reset();
+    setMessage("#media-song-create-message", result.message || "Cântarea a fost creată.", "success");
+    await loadConductorMedia();
+    $("#media-song-select").value = result.song.id;
+  } catch (error) {
+    setMessage("#media-song-create-message", error.message, "error");
+  } finally {
+    button.disabled = false;
+  }
+});
+$("#media-upload-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = form.querySelector('button[type="submit"]');
+  const file = $("#media-file-input").files?.[0];
+  const songId = $("#media-song-select").value;
+  if (!file || !songId) {
+    setMessage("#media-upload-message", "Alege cântarea și fișierul de încărcat.", "error");
+    return;
+  }
+  button.disabled = true;
+  setMessage("#media-upload-message", "Se pregătește încărcarea…");
+  try {
+    const upload = await requestJSON("/api/conductor/songs/" + encodeURIComponent(songId) + "/assets/upload-url", "POST", {
+      voicePart: $("#media-voice-select").value,
+      format: $("#media-format-select").value,
+      fileName: file.name,
+      contentType: file.type,
+      sizeBytes: file.size
+    });
+    setMessage("#media-upload-message", "Se încarcă direct în Backblaze B2…");
+    let uploadResponse;
+    try {
+      uploadResponse = await fetch(upload.uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": upload.contentType },
+        body: file
+      });
+    } catch {
+      throw new Error("Încărcarea directă a eșuat. Verifică politica CORS a bucket-ului Backblaze pentru https://cor.tabororadea.workers.dev și încearcă din nou.");
+    }
+    if (!uploadResponse.ok) {
+      throw new Error("Backblaze a respins fișierul (HTTP " + uploadResponse.status + "). Verifică CORS și permisiunile cheii pentru bucket.");
+    }
+    setMessage("#media-upload-message", "Fișierul a fost transferat. Se verifică integritatea…");
+    const result = await requestJSON("/api/conductor/assets/complete", "POST", { uploadId: upload.uploadId });
+    $("#media-file-input").value = "";
+    setMessage("#media-upload-message", result.message || "Fișierul a fost încărcat.", "success");
+    await loadConductorMedia();
+    await loadSongs($("#conductor-voice").value, true);
+  } catch (error) {
+    setMessage("#media-upload-message", error.message, "error");
+  } finally {
+    const status = await requestJSON("/api/conductor/songs").catch(() => ({ configured: false }));
+    button.disabled = !status.configured;
+  }
+});
 function showIssuedCode(code, message, label = "Notează acest cod") {
   state.issuedCode = code || "";
   $("#credentials-title").textContent = label;
@@ -145,6 +340,7 @@ function enterApp(user) {
     showOnly("conductor");
     $("#conductor-role-badge").textContent = roleNames[user.role];
     loadSongs($("#conductor-voice").value, true);
+    void loadConductorMedia();
   } else {
     showOnly("member");
     $("#voice-badge").textContent = voiceNames[user.voicePart] || "Voce nealocată";
