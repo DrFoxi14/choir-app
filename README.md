@@ -63,6 +63,8 @@ In the bucket's CORS settings, choose the **S3-Compatible API** and allow only t
 
 If the app later uses another public hostname, add that exact origin separately. Do not allow every origin. CORS permits the browser upload request; it does not make the bucket public or replace signed-request authorization. Backblaze's [S3 CORS guide](https://www.backblaze.com/docs/cloud-storage-enable-cors-with-the-s3-compatible-api) documents the bucket rules.
 
+If a browser upload fails, use **Testează conexiunea B2** in the conductor media library. The diagnostic performs a signed read request to a random, non-existing object and a simulated S3 CORS preflight for `PUT` with `content-type`. It reports status codes and CORS response headers but never returns signed URLs or storage credentials. A valid signature check should return the expected missing-object response; CORS must allow the Worker origin, `PUT`, and `content-type`.
+
 ### 4. Use the media library
 
 Sign in as a conductor or owner. In **Biblioteca de fișiere**, create a song as a draft, choose the song, voice and file type, upload one file, then publish the song. Only published assets for a member's assigned voice are returned in their catalog. The catalog never exposes B2 object keys; downloads redirect to short-lived signed URLs.
