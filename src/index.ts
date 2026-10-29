@@ -1537,7 +1537,7 @@ async function saveAttendance(request: Request, env: Env): Promise<Response> {
   if (typeof body.title !== "string") {
     return fail("invalid_attendance_title", "Completează denumirea repetiției.", 400);
   }
-  const title = body.title.trim().replace(/[\\u0000-\\u001f\\u007f]/g, "").replace(/\s+/g, " ");
+  const title = body.title.trim().replace(/[\\u0000-\\u001f\\u007f]/g, "").replace(/\\s+/g, " ");
   if (!title || title.length > 80) {
     return fail("invalid_attendance_title", "Denumirea trebuie să aibă între 1 și 80 de caractere.", 400);
   }
