@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - feature/account-colors-attendance-export
+      - feature/backblaze-b2-media
     paths:
       - "migrations/**"
       - "wrangler.toml"
