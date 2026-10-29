@@ -1,4 +1,5 @@
 from pathlib import Path
+import tomllib
 
 root = Path(__file__).resolve().parents[1]
 worker = (root / "src" / "index.ts").read_text()
@@ -8,10 +9,18 @@ dashboard_html = (root / "public" / "dashboard.html").read_text()
 dashboard_js = (root / "public" / "dashboard.js").read_text()
 migration = (root / "migrations" / "0006_immutable_audit_logs.sql").read_text()
 
+assets_config = tomllib.loads((root / "wrangler.toml").read_text()).get("assets", {})
+worker_first_routes = assets_config.get("run_worker_first", [])
+
 # The UI labels both internal conductor roles simply as "Dirijor".
 assert 'const roleNames = { owner: "Dirijor", conductor: "Dirijor", member: "Membru" };' in main_js
 assert 'id="admin-dashboard-link"' in main_html
 assert 'adminDashboardLink.classList.toggle("hidden", user.role !== "owner")' in main_js
+
+# Worker-first routing is required so static assets cannot intercept the protected dashboard path.
+assert "/api/*" in worker_first_routes
+assert "/dashboard*" in worker_first_routes, "Dashboard requests must reach the Worker before static assets"
+assert 'if (url.pathname === "/dashboard" || url.pathname === "/dashboard/" || url.pathname === "/dashboard.html") {' in worker
 
 # Both the HTML route and data endpoint enforce owner-only access server-side.
 assert '"/dashboard": "dashboard.html"' in worker
