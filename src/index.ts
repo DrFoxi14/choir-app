@@ -2047,7 +2047,7 @@ export default {
         );
       }
     }
-    if (url.pathname === "/dashboard" || url.pathname === "/dashboard/") {
+    if (url.pathname === "/dashboard" || url.pathname === "/dashboard/" || url.pathname === "/dashboard.html") {
       const current = await getCurrentSession(request, env);
       if (!current || current.role !== "owner" ||
           !(await hasCurrentLegalAcceptance(env, current.userId, current.choirId))) {
@@ -2060,6 +2060,7 @@ export default {
     const staticPages: Record<string, string> = {
       "/dashboard": "dashboard.html",
       "/dashboard/": "dashboard.html",
+      "/dashboard.html": "dashboard.html",
       "/invitation": "invitation.html",
       "/invitation/": "invitation.html",
       "/account": "account.html",
