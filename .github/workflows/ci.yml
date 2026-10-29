@@ -37,6 +37,7 @@ jobs:
           node --check public/invitation.js
           node --check public/account.js
           node --check public/attendance.js
+          node --check public/dashboard.js
 
       - name: Smoke-test D1 migrations
         run: python3 tests/schema_smoke.py
@@ -52,6 +53,12 @@ jobs:
 
       - name: Smoke-test Backblaze media integration
         run: python3 tests/backblaze_media_smoke.py
+
+      - name: Smoke-test private media download safeguards
+        run: python3 tests/media_download_security_smoke.py
+
+      - name: Smoke-test song deletion and audit dashboard security
+        run: python3 tests/dashboard_security_smoke.py
 
       - name: Smoke-test one-paste Preview D1 bootstrap
         run: python3 tests/preview_d1_bootstrap_smoke.py

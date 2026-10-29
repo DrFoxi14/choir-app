@@ -15,7 +15,7 @@ B2_BUCKET = "choir-tabor-media-1"
 [assets]
 directory = "./public"
 binding = "ASSETS"
-run_worker_first = ["/api/*"]
+run_worker_first = ["/api/*", "/dashboard*"]
 
 [[d1_databases]]
 binding = "DB"
