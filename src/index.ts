@@ -1251,7 +1251,7 @@ async function downloadSongAsset(request: Request, env: Env, assetId: string): P
     }
   });
 }
-async function listMemberContacts(request: Request, env: Env): Promise<Response> {async function listMemberContacts(request: Request, env: Env): Promise<Response> {
+async function listMemberContacts(request: Request, env: Env): Promise<Response> {
   const current = await requireSession(request, env);
   if (current instanceof Response) return current;
   if (!isConductor(current)) {
