@@ -15,6 +15,17 @@ assert 'presignB2Object(config, "PUT"' in worker
 assert 'presignB2Object(config, "HEAD"' in worker
 assert 'presignB2Object(config, "GET"' in worker
 assert 'fetch(headUrl, { method: "HEAD" })' in worker
+
+# Private download links use a short capability lifetime, a safe download filename,
+# and an audit event that deliberately excludes the signed URL/object key.
+download_start = worker.index("async function downloadSongAsset(")
+download_end = worker.index("async function listMemberContacts(", download_start)
+download = worker[download_start:download_end]
+assert 'presignB2Object(config, "GET", asset.objectKey, 300)' in download
+assert 'Content-Disposition' in download and "filename*=UTF-8''" in download
+assert 'media.asset.download_link_issued' in download
+assert 'signedUrl' not in download[download.index('await recordAudit'):], "Signed URLs must not be audited"
+assert 'objectKey' not in download[download.index('await recordAudit'):], "Private object keys must not be audited"
 diagnostic_start = worker.index("async function diagnoseMediaStorage(")
 diagnostic_end = worker.index("async function createSong(", diagnostic_start)
 diagnostic = worker[diagnostic_start:diagnostic_end]
